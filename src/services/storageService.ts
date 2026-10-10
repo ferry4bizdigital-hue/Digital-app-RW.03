@@ -61,6 +61,31 @@ const STORAGE_KEYS = {
   SYNC_VERSION: 'rw03_sync_version'
 };
 
+const PURGE_FLAG_KEY = 'rw03_cleared_all_data_v2026_10_final';
+if (typeof window !== 'undefined' && window.localStorage) {
+  if (localStorage.getItem(PURGE_FLAG_KEY) !== 'true') {
+    localStorage.setItem(STORAGE_KEYS.RESIDENTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.DELETED_RESIDENTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.FAMILIES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.DELETED_FAMILIES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.COMPLAINTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.SETORAN_RT, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.ANNOUNCEMENTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.DUES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.LETTERS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
+    localStorage.setItem(STORAGE_KEYS.DELETED_USERS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.SYNC_VERSION, '20');
+    localStorage.setItem(PURGE_FLAG_KEY, 'true');
+  }
+}
+
 function getStorage<T>(key: string, fallback: T): T {
   try {
     let raw = localStorage.getItem(key);
@@ -195,22 +220,22 @@ export class StorageService {
     if (!serverData) return;
     if (Array.isArray(serverData.users) && serverData.users.length > 0) setStorage(STORAGE_KEYS.USERS, serverData.users);
     if (Array.isArray(serverData.deletedUsers)) setStorage(STORAGE_KEYS.DELETED_USERS, serverData.deletedUsers);
-    if (Array.isArray(serverData.residents) && serverData.residents.length > 0) setStorage(STORAGE_KEYS.RESIDENTS, serverData.residents);
+    if (Array.isArray(serverData.residents)) setStorage(STORAGE_KEYS.RESIDENTS, serverData.residents);
     if (Array.isArray(serverData.deletedResidents)) setStorage(STORAGE_KEYS.DELETED_RESIDENTS, serverData.deletedResidents);
-    if (Array.isArray(serverData.families) && serverData.families.length > 0) setStorage(STORAGE_KEYS.FAMILIES, serverData.families);
+    if (Array.isArray(serverData.families)) setStorage(STORAGE_KEYS.FAMILIES, serverData.families);
     if (Array.isArray(serverData.deletedFamilies)) setStorage(STORAGE_KEYS.DELETED_FAMILIES, serverData.deletedFamilies);
-    if (Array.isArray(serverData.letters) && serverData.letters.length > 0) setStorage(STORAGE_KEYS.LETTERS, serverData.letters);
-    if (Array.isArray(serverData.announcements) && serverData.announcements.length > 0) setStorage(STORAGE_KEYS.ANNOUNCEMENTS, serverData.announcements);
-    if (Array.isArray(serverData.events) && serverData.events.length > 0) setStorage(STORAGE_KEYS.EVENTS, serverData.events);
-    if (Array.isArray(serverData.complaints) && serverData.complaints.length > 0) setStorage(STORAGE_KEYS.COMPLAINTS, serverData.complaints);
-    if (Array.isArray(serverData.dues) && serverData.dues.length > 0) setStorage(STORAGE_KEYS.DUES, serverData.dues);
-    if (Array.isArray(serverData.transactions) && serverData.transactions.length > 0) setStorage(STORAGE_KEYS.TRANSACTIONS, serverData.transactions);
-    if (Array.isArray(serverData.setoranRt) && serverData.setoranRt.length > 0) setStorage(STORAGE_KEYS.SETORAN_RT, serverData.setoranRt);
-    if (Array.isArray(serverData.inventory) && serverData.inventory.length > 0) setStorage(STORAGE_KEYS.INVENTORY, serverData.inventory);
-    if (Array.isArray(serverData.notifications) && serverData.notifications.length > 0) setStorage(STORAGE_KEYS.NOTIFICATIONS, serverData.notifications);
-    if (Array.isArray(serverData.auditLogs) && serverData.auditLogs.length > 0) setStorage(STORAGE_KEYS.AUDIT_LOGS, serverData.auditLogs);
-    if (Array.isArray(serverData.wargaNgontrakUsaha) && serverData.wargaNgontrakUsaha.length > 0) setStorage(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, serverData.wargaNgontrakUsaha);
-    if (Array.isArray(serverData.emergencyContacts) && serverData.emergencyContacts.length > 0) setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, serverData.emergencyContacts);
+    if (Array.isArray(serverData.letters)) setStorage(STORAGE_KEYS.LETTERS, serverData.letters);
+    if (Array.isArray(serverData.announcements)) setStorage(STORAGE_KEYS.ANNOUNCEMENTS, serverData.announcements);
+    if (Array.isArray(serverData.events)) setStorage(STORAGE_KEYS.EVENTS, serverData.events);
+    if (Array.isArray(serverData.complaints)) setStorage(STORAGE_KEYS.COMPLAINTS, serverData.complaints);
+    if (Array.isArray(serverData.dues)) setStorage(STORAGE_KEYS.DUES, serverData.dues);
+    if (Array.isArray(serverData.transactions)) setStorage(STORAGE_KEYS.TRANSACTIONS, serverData.transactions);
+    if (Array.isArray(serverData.setoranRt)) setStorage(STORAGE_KEYS.SETORAN_RT, serverData.setoranRt);
+    if (Array.isArray(serverData.inventory)) setStorage(STORAGE_KEYS.INVENTORY, serverData.inventory);
+    if (Array.isArray(serverData.notifications)) setStorage(STORAGE_KEYS.NOTIFICATIONS, serverData.notifications);
+    if (Array.isArray(serverData.auditLogs)) setStorage(STORAGE_KEYS.AUDIT_LOGS, serverData.auditLogs);
+    if (Array.isArray(serverData.wargaNgontrakUsaha)) setStorage(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, serverData.wargaNgontrakUsaha);
+    if (Array.isArray(serverData.emergencyContacts)) setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, serverData.emergencyContacts);
     this.notify();
   }
 
@@ -303,25 +328,17 @@ export class StorageService {
       if (json.success && json.data) {
         this.isServerConnected = true;
         const serverDb = json.data;
-        const localResidents = this.getResidents();
-        const serverResidents = Array.isArray(serverDb.residents) ? serverDb.residents : [];
+        const localVersion = getStorage<number>(STORAGE_KEYS.SYNC_VERSION, 1);
+        const serverVersion = json.version || 1;
 
-        // Periksa apakah browser saat ini memiliki data input yang lebih baru / lebih banyak dari server:
-        const localHasNewerCustomData = 
-          (localResidents.length > serverResidents.length) ||
-          (localResidents.some(lr => !serverResidents.some((sr: any) => sr.id === lr.id))) ||
-          (this.getDues().length > (serverDb.dues?.length || 0)) ||
-          (this.getTransactions().length > (serverDb.transactions?.length || 0));
-
-        if (localHasNewerCustomData) {
-          console.log('[StorageService] Local data has custom inputs, syncing up to server database...');
-          await this.pushToServer(true);
-        } else if (serverResidents.length > 0) {
+        if (serverVersion >= localVersion) {
           console.log('[StorageService] Applying server canonical data to local storage...');
           this.applyServerData(serverDb);
           this.lastSyncTime = json.lastSyncedAt || new Date().toISOString();
           setStorage(STORAGE_KEYS.LAST_SYNCED_AT, this.lastSyncTime);
-          if (json.version) setStorage(STORAGE_KEYS.SYNC_VERSION, json.version);
+          setStorage(STORAGE_KEYS.SYNC_VERSION, serverVersion);
+        } else {
+          await this.pushToServer(true);
         }
         this.notifySync();
       }
@@ -802,26 +819,15 @@ export class StorageService {
   public static getFamilies(): FamilyCard[] {
     const deletedKks = this.getDeletedFamilyKks();
     let list = getStorage<FamilyCard[]>(STORAGE_KEYS.FAMILIES, INITIAL_FAMILIES);
-    let changed = false;
 
     if (deletedKks.length > 0) {
       const prevLen = list.length;
       list = list.filter(f => !deletedKks.includes(f.nomorKK));
       if (list.length !== prevLen) {
-        changed = true;
+        setStorage(STORAGE_KEYS.FAMILIES, list);
       }
     }
 
-    for (const fam of INITIAL_FAMILIES) {
-      if (deletedKks.includes(fam.nomorKK)) continue;
-      if (!list.some(f => f.nomorKK === fam.nomorKK)) {
-        list.push(fam);
-        changed = true;
-      }
-    }
-    if (changed) {
-      setStorage(STORAGE_KEYS.FAMILIES, list);
-    }
     return list;
   }
 
@@ -1006,12 +1012,7 @@ export class StorageService {
 
   // --- PENGAJUAN SURAT ---
   public static getLetters(): LetterRequest[] {
-    let list = getStorage<LetterRequest[]>(STORAGE_KEYS.LETTERS, INITIAL_LETTERS);
-    if (!list || list.length === 0) {
-      list = INITIAL_LETTERS;
-      setStorage(STORAGE_KEYS.LETTERS, list);
-    }
-    return list;
+    return getStorage<LetterRequest[]>(STORAGE_KEYS.LETTERS, []);
   }
 
   public static createLetterRequest(request: Omit<LetterRequest, 'id' | 'status' | 'tanggalPengajuan' | 'nomorSurat'>): LetterRequest {
@@ -1193,12 +1194,7 @@ export class StorageService {
 
   // --- PENGUMUMAN ---
   public static getAnnouncements(): Announcement[] {
-    let list = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, INITIAL_ANNOUNCEMENTS);
-    if (!list || list.length === 0) {
-      list = INITIAL_ANNOUNCEMENTS;
-      setStorage(STORAGE_KEYS.ANNOUNCEMENTS, list);
-    }
-    return list;
+    return getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, []);
   }
 
   public static addAnnouncement(item: Omit<Announcement, 'id' | 'tanggalPublikasi'>): Announcement {
@@ -1285,12 +1281,7 @@ export class StorageService {
 
   // --- AGENDA / KEGIATAN ---
   public static getEvents(): CommunityEvent[] {
-    let list = getStorage<CommunityEvent[]>(STORAGE_KEYS.EVENTS, INITIAL_EVENTS);
-    if (!list || list.length === 0) {
-      list = INITIAL_EVENTS;
-      setStorage(STORAGE_KEYS.EVENTS, list);
-    }
-    return list;
+    return getStorage<CommunityEvent[]>(STORAGE_KEYS.EVENTS, []);
   }
 
   public static addEvent(event: Omit<CommunityEvent, 'id'>): CommunityEvent {
@@ -1375,12 +1366,7 @@ export class StorageService {
 
   // --- PENGADUAN WARGA ---
   public static getComplaints(): Complaint[] {
-    let list = getStorage<Complaint[]>(STORAGE_KEYS.COMPLAINTS, INITIAL_COMPLAINTS);
-    if (!list || list.length === 0) {
-      list = INITIAL_COMPLAINTS;
-      setStorage(STORAGE_KEYS.COMPLAINTS, list);
-    }
-    return list;
+    return getStorage<Complaint[]>(STORAGE_KEYS.COMPLAINTS, []);
   }
 
   public static addComplaint(item: Omit<Complaint, 'id' | 'status' | 'tanggalLaporan' | 'komentar'>): Complaint {
@@ -1487,20 +1473,7 @@ export class StorageService {
 
   // --- IURAN WARGA ---
   public static getDues(): DueBill[] {
-    let list = getStorage<DueBill[]>(STORAGE_KEYS.DUES, INITIAL_DUES);
-    if (!list || list.length === 0) {
-      list = INITIAL_DUES;
-      setStorage(STORAGE_KEYS.DUES, list);
-    }
-    // Hapus semua input iuran jenis Sosial & Kematian baik lunas maupun belum bayar agar matrik mulai dari Rp 0
-    const hasReset = localStorage.getItem('rw03_sosial_reset_zero_v2');
-    if (!hasReset) {
-      const cleaned = list.filter(d => !(d.jenisIuran && (d.jenisIuran.includes('Sosial') || d.jenisIuran.includes('Kematian'))));
-      setStorage(STORAGE_KEYS.DUES, cleaned);
-      localStorage.setItem('rw03_sosial_reset_zero_v2', 'true');
-      return cleaned;
-    }
-    return list;
+    return getStorage<DueBill[]>(STORAGE_KEYS.DUES, []);
   }
 
   public static addDueBill(item: Omit<DueBill, 'id'>): DueBill {
@@ -1632,11 +1605,7 @@ export class StorageService {
   // --- KEUANGAN (BUKU KAS & TRANSPARANSI RW 03) ---
   // Buku Kas RW 03 dikelola secara transparan dan berubah jika ada penginputan Catat Transaksi dan Catat Pengeluaran
   public static getTransactions(): FinancialTransaction[] {
-    let list = getStorage<FinancialTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
-    if (!list || list.length === 0) {
-      list = INITIAL_TRANSACTIONS;
-      setStorage(STORAGE_KEYS.TRANSACTIONS, list);
-    }
+    let list = getStorage<FinancialTransaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
     
     // Bersihkan transaksi sisa tagihan individu (trx-due-*) jika ada agar Buku Kas bersih dan murni dari Catat Transaksi & Catat Pengeluaran
     const hasDueTransactions = list.some(t => t.id.startsWith('trx-due-'));
