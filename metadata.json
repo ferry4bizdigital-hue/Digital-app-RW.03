@@ -1,0 +1,6 @@
+{
+  "name": "Digital RW.03 Kebonkangkung",
+  "description": "Sistem Informasi & Digitalisasi Administrasi RW 03 Kebonkangkung - Pelayanan Warga, Pengurus RT, dan Ketua RW.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
