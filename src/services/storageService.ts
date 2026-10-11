@@ -218,9 +218,63 @@ export class StorageService {
 
   public static applyServerData(serverData: Record<string, any>): void {
     if (!serverData) return;
-    if (Array.isArray(serverData.users) && serverData.users.length > 0) setStorage(STORAGE_KEYS.USERS, serverData.users);
+
+    if (Array.isArray(serverData.users) && serverData.users.length > 0) {
+      const currentUsers = getStorage<User[]>(STORAGE_KEYS.USERS, []);
+      const deletedUserIds = this.getDeletedUserIds();
+      const map = new Map<string, User>();
+
+      // Muat pengguna dari data server
+      serverData.users.forEach((u: User) => {
+        if (!deletedUserIds.includes(u.userId) && (!u.NIK || u.NIK === '-' || !deletedUserIds.includes(u.NIK))) {
+          map.set(u.userId, u);
+          if (u.NIK && u.NIK !== '-') {
+            map.set(`nik_${u.NIK}`, u);
+          }
+        }
+      });
+
+      // Pertahankan akun warga yang baru didaftarkan secara mandiri di browser lokal agar tidak terhapus saat sync
+      currentUsers.forEach((u: User) => {
+        if (!deletedUserIds.includes(u.userId) && (!u.NIK || u.NIK === '-' || !deletedUserIds.includes(u.NIK))) {
+          const byId = map.get(u.userId);
+          const byNik = u.NIK && u.NIK !== '-' ? map.get(`nik_${u.NIK}`) : undefined;
+          if (!byId && !byNik) {
+            map.set(u.userId, u);
+          }
+        }
+      });
+
+      setStorage(STORAGE_KEYS.USERS, Array.from(new Set(map.values())));
+    }
+
     if (Array.isArray(serverData.deletedUsers)) setStorage(STORAGE_KEYS.DELETED_USERS, serverData.deletedUsers);
-    if (Array.isArray(serverData.residents)) setStorage(STORAGE_KEYS.RESIDENTS, serverData.residents);
+
+    if (Array.isArray(serverData.residents)) {
+      const currentResidents = getStorage<Resident[]>(STORAGE_KEYS.RESIDENTS, []);
+      const deletedResidents = this.getDeletedResidentIds();
+      const map = new Map<string, Resident>();
+
+      serverData.residents.forEach((r: Resident) => {
+        if (!deletedResidents.includes(r.id) && (!r.NIK || !deletedResidents.includes(r.NIK))) {
+          map.set(r.id, r);
+          if (r.NIK) map.set(`nik_${r.NIK}`, r);
+        }
+      });
+
+      currentResidents.forEach((r: Resident) => {
+        if (!deletedResidents.includes(r.id) && (!r.NIK || !deletedResidents.includes(r.NIK))) {
+          const byId = map.get(r.id);
+          const byNik = r.NIK ? map.get(`nik_${r.NIK}`) : undefined;
+          if (!byId && !byNik) {
+            map.set(r.id, r);
+          }
+        }
+      });
+
+      setStorage(STORAGE_KEYS.RESIDENTS, Array.from(new Set(map.values())));
+    }
+
     if (Array.isArray(serverData.deletedResidents)) setStorage(STORAGE_KEYS.DELETED_RESIDENTS, serverData.deletedResidents);
     if (Array.isArray(serverData.families)) setStorage(STORAGE_KEYS.FAMILIES, serverData.families);
     if (Array.isArray(serverData.deletedFamilies)) setStorage(STORAGE_KEYS.DELETED_FAMILIES, serverData.deletedFamilies);
@@ -483,6 +537,7 @@ export class StorageService {
     }
     setStorage(STORAGE_KEYS.USERS, list);
     this.notify();
+    this.pushToServer(true).catch(() => {});
   }
 
   public static updateUser(userId: string, data: Partial<User>): User | null {
@@ -492,6 +547,7 @@ export class StorageService {
     list[idx] = { ...list[idx], ...data, updatedAt: new Date().toISOString() };
     setStorage(STORAGE_KEYS.USERS, list);
     this.notify();
+    this.pushToServer(true).catch(() => {});
     return list[idx];
   }
 

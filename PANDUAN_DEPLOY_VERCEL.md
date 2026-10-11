@@ -29,9 +29,10 @@ Aplikasi ini telah dikonfigurasi secara lengkap untuk siap di-deploy langsung ke
 4. **`package.json`**
    - Ditambahkan script `"vercel-build": "vite build"`.
 
-5. **Tampilan Awal Login di Vercel (`src/App.tsx`)**
-   - Saat aplikasi dibuka di domain Vercel (`*.vercel.app`), pengguna akan **langsung diarahkan ke Halaman Login (`LoginScreen`)**.
-   - Tersedia tombol cepat akun pengurus (Super Admin IT, Ketua RW, Bendahara, Ketua RT 01) serta form registrasi warga baru mandiri.
+5. **Tampilan Halaman Login di Vercel (`src/App.tsx` & `LoginScreen.tsx`)**
+   - Saat aplikasi dibuka di domain Vercel (`*.vercel.app`), pengguna akan **langsung diarahkan ke Halaman Login**.
+   - **Tombol Masuk Cepat (Uji Coba) otomatis disembunyikan** di domain Vercel untuk tampilan profesional siap pakai.
+   - **Registrasi Akun Warga Baru Mandiri**: Warga dapat langsung mendaftar dengan Nama Lengkap (KTP), NIK 16 digit, RT, nomor WhatsApp, dan kata sandi baru. Sistem secara otomatis mengaktifkan akun dan mencatatkannya ke data kependudukan warga RT terkait tanpa hambatan "sudah terdaftar".
    - Sesi login tetap tersimpan selama tab browser aktif, dan jika pengguna mengklik "Keluar", tampilan akan kembali ke halaman Login.
 
 ---

@@ -29,7 +29,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [regRt, setRegRt] = useState('02');
   const [regSuccess, setRegSuccess] = useState(false);
 
-  const allUsers = StorageService.getUsers();
+  const [quickLoginTarget, setQuickLoginTarget] = useState<User | null>(null);
+
+  const isVercelDeploy = typeof window !== 'undefined' && (
+    window.location.hostname.includes('vercel.app') ||
+    window.location.hostname.includes('vercel.dev')
+  );
 
   const handleNormalLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,9 +46,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // Cocokkan data user dari penyimpanan berdasarkan Email atau NIK
-    const found = allUsers.find(
-      u => u.email.toLowerCase() === cleanInput.toLowerCase() || u.NIK === cleanInput
+    // Ambil data user terbaru dari penyimpanan
+    const usersList = StorageService.getUsers();
+
+    // Cocokkan data user dari penyimpanan berdasarkan Email, NIK, atau userId
+    const found = usersList.find(
+      u => (u.email && u.email.toLowerCase() === cleanInput.toLowerCase()) || 
+           (u.NIK && u.NIK === cleanInput) ||
+           (u.userId && u.userId.toLowerCase() === cleanInput.toLowerCase())
     );
 
     if (found) {
@@ -71,7 +81,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }
 
     if (cleanNik.length !== 16) {
-      setErrorMsg('Nomor Induk Kependudukan (NIK) harus terdiri dari 16 digit.');
+      setErrorMsg('Nomor Induk Kependudukan (NIK) harus terdiri dari 16 digit angka.');
       return;
     }
 
@@ -80,14 +90,81 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // Cek apakah NIK sudah pernah terdaftar
-    const existing = allUsers.find(u => u.NIK === cleanNik);
-    if (existing) {
-      setErrorMsg('NIK ini sudah terdaftar sebagai akun. Silakan login pada halaman masuk.');
+    // Ambil daftar pengguna terkini
+    const usersList = StorageService.getUsers();
+    const existing = usersList.find(u => u.NIK === cleanNik);
+
+    // KASUS 1: NIK sudah terdaftar sebagai akun Pengurus (Super Admin / RW / Bendahara / RT)
+    if (existing && existing.role !== 'warga') {
+      setQuickLoginTarget(existing);
+      setErrorMsg(`NIK ${cleanNik} terdaftar sebagai akun Pengurus (${existing.jabatan || existing.role}) an. ${existing.nama}. Silakan login pada halaman Masuk.`);
       return;
     }
 
-    // Buat akun warga baru yang LANGSUNG AKTIF tanpa menunggu verifikasi
+    // KASUS 2: NIK sudah terdaftar sebagai Akun Warga (baik data bawaan, RT, atau registrasi sebelumnya)
+    // Jangan tolak dengan pesan gagal/sudah terdaftar, tapi langsung perbarui password dan aktifkan akun!
+    if (existing && existing.role === 'warga') {
+      const updatedUser: User = {
+        ...existing,
+        nama: cleanNama || existing.nama,
+        email: regEmail.trim() || existing.email || `${cleanNik}@warga.kebonkangkung.id`,
+        nomorHP: regHp.trim() || existing.nomorHP || '-',
+        password: cleanPass,
+        RT: regRt,
+        statusAkun: 'aktif',
+        updatedAt: new Date().toISOString()
+      };
+
+      StorageService.updateUser(existing.userId, updatedUser);
+      StorageService.setCurrentUser(updatedUser);
+
+      // Sinkronkan ke data kependudukan (residents) jika ada
+      const residents = StorageService.getResidents();
+      const res = residents.find(r => r.NIK === cleanNik);
+      if (res) {
+        StorageService.updateResident(res.id, {
+          namaLengkap: cleanNama,
+          rt: regRt,
+          nomorHP: regHp.trim() || res.nomorHP,
+          email: regEmail.trim() || res.email
+        });
+      } else {
+        StorageService.addResident({
+          NIK: cleanNik,
+          nomorKK: `327318${regRt}${cleanNik.slice(-8)}`,
+          namaLengkap: cleanNama,
+          jenisKelamin: 'L',
+          tempatLahir: 'Bandung',
+          tanggalLahir: '1990-01-01',
+          usia: 35,
+          agama: 'Islam',
+          pendidikan: 'SMA/Sederajat',
+          pekerjaan: '-',
+          statusPerkawinan: 'Kawin',
+          hubunganKeluarga: 'Kepala Keluarga',
+          statusDomisili: 'KTP & Domisili',
+          statusWarga: 'Tetap',
+          alamat: `RT ${regRt} / RW 03 Kebon Kangkung`,
+          rt: regRt,
+          rw: '03',
+          nomorHP: regHp.trim() || '-',
+          email: regEmail.trim() || `${cleanNik}@warga.kebonkangkung.id`
+        });
+      }
+
+      setRegSuccess(true);
+      setErrorMsg('');
+
+      // Sinkronkan ke server secara langsung
+      StorageService.pushToServer(true).catch(() => {});
+
+      setTimeout(() => {
+        onLoginSuccess(updatedUser);
+      }, 1200);
+      return;
+    }
+
+    // KASUS 3: Warga pendaftar baru
     const newUser: User = {
       userId: `usr-warga-${Date.now()}`,
       nama: cleanNama,
@@ -105,14 +182,43 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     };
 
     StorageService.addUser(newUser);
+
+    // Otomatis tambahkan data kependudukan warga agar terdata di RT
+    const residents = StorageService.getResidents();
+    if (!residents.some(r => r.NIK === cleanNik)) {
+      StorageService.addResident({
+        NIK: cleanNik,
+        nomorKK: `327318${regRt}${cleanNik.slice(-8)}`,
+        namaLengkap: cleanNama,
+        jenisKelamin: 'L',
+        tempatLahir: 'Bandung',
+        tanggalLahir: '1990-01-01',
+        usia: 35,
+        agama: 'Islam',
+        pendidikan: 'SMA/Sederajat',
+        pekerjaan: '-',
+        statusPerkawinan: 'Kawin',
+        hubunganKeluarga: 'Kepala Keluarga',
+        statusDomisili: 'KTP & Domisili',
+        statusWarga: 'Tetap',
+        alamat: `RT ${regRt} / RW 03 Kebon Kangkung`,
+        rt: regRt,
+        rw: '03',
+        nomorHP: regHp.trim() || '-',
+        email: regEmail.trim() || `${cleanNik}@warga.kebonkangkung.id`
+      });
+    }
+
     setRegSuccess(true);
     setErrorMsg('');
 
-    // Langsung masuk otomatis tanpa menunggu verifikasi
+    // Sinkronkan ke server secara langsung
+    StorageService.pushToServer(true).catch(() => {});
+
     setTimeout(() => {
       StorageService.setCurrentUser(newUser);
       onLoginSuccess(newUser);
-    }, 1500);
+    }, 1200);
   };
 
   return (
@@ -135,7 +241,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         <div className="p-6">
           {errorMsg && (
             <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
-              {errorMsg}
+              <p>{errorMsg}</p>
+              {quickLoginTarget && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailOrNik(quickLoginTarget.NIK || quickLoginTarget.email);
+                    setPassword('');
+                    setIsRegisterMode(false);
+                    setErrorMsg('');
+                    setQuickLoginTarget(null);
+                  }}
+                  className="mt-2 text-xs font-bold text-emerald-700 bg-white border border-emerald-300 hover:bg-emerald-50 px-2.5 py-1 rounded-lg cursor-pointer transition-colors block text-left"
+                >
+                  → Masuk Sekarang Menggunakan NIK {quickLoginTarget.NIK} ({quickLoginTarget.nama})
+                </button>
+              )}
             </div>
           )}
 
@@ -188,6 +309,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   onClick={() => {
                     setIsRegisterMode(true);
                     setErrorMsg('');
+                    setQuickLoginTarget(null);
                   }}
                   className="text-emerald-700 font-bold hover:underline cursor-pointer"
                 >
@@ -195,65 +317,67 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 </button>
               </div>
 
-              {/* Quick Fill / Demo Accounts for Vercel & Testing */}
-              <div className="pt-3 border-t border-slate-100">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-2 text-center">
-                  Masuk Cepat Akun Pengurus (Uji Coba)
-                </span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmailOrNik('admin@kebonkangkung.id');
-                      setPassword('SuperAdmin#2026');
-                      setErrorMsg('');
-                    }}
-                    className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-800 block">Super Admin IT</span>
-                    <span className="text-[10px] text-slate-400">admin@...</span>
-                  </button>
+              {/* Quick Fill / Demo Accounts: Tersembunyi saat di-deploy ke Vercel sesuai permintaan */}
+              {!isVercelDeploy && (
+                <div className="pt-3 border-t border-slate-100">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-2 text-center">
+                    Masuk Cepat Akun Pengurus (Uji Coba)
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailOrNik('admin@kebonkangkung.id');
+                        setPassword('SuperAdmin#2026');
+                        setErrorMsg('');
+                      }}
+                      className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
+                    >
+                      <span className="font-bold text-slate-800 block">Super Admin IT</span>
+                      <span className="text-[10px] text-slate-400">admin@...</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmailOrNik('bambang.rw03@kebonkangkung.id');
-                      setPassword('Rw03#Bambang');
-                      setErrorMsg('');
-                    }}
-                    className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-800 block">Ketua RW 03</span>
-                    <span className="text-[10px] text-slate-400">bambang...</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailOrNik('bambang.rw03@kebonkangkung.id');
+                        setPassword('Rw03#Bambang');
+                        setErrorMsg('');
+                      }}
+                      className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
+                    >
+                      <span className="font-bold text-slate-800 block">Ketua RW 03</span>
+                      <span className="text-[10px] text-slate-400">bambang...</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmailOrNik('bendahara.rw03@kebonkangkung.id');
-                      setPassword('Bendahara#Rw03');
-                      setErrorMsg('');
-                    }}
-                    className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-800 block">Bendahara RW</span>
-                    <span className="text-[10px] text-slate-400">bendahara...</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailOrNik('bendahara.rw03@kebonkangkung.id');
+                        setPassword('Bendahara#Rw03');
+                        setErrorMsg('');
+                      }}
+                      className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
+                    >
+                      <span className="font-bold text-slate-800 block">Bendahara RW</span>
+                      <span className="text-[10px] text-slate-400">bendahara...</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmailOrNik('rahmat.rt01@kebonkangkung.id');
-                      setPassword('Rt01#Rahmat');
-                      setErrorMsg('');
-                    }}
-                    className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-800 block">Ketua RT 01</span>
-                    <span className="text-[10px] text-slate-400">rahmat...</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailOrNik('rahmat.rt01@kebonkangkung.id');
+                        setPassword('Rt01#Rahmat');
+                        setErrorMsg('');
+                      }}
+                      className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
+                    >
+                      <span className="font-bold text-slate-800 block">Ketua RT 01</span>
+                      <span className="text-[10px] text-slate-400">rahmat...</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </form>
           )}
 

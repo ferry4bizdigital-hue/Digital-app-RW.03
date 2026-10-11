@@ -18,28 +18,12 @@ import {
 
 export const INITIAL_USERS: User[] = [
   {
-    userId: 'usr-admin-01',
-    nama: 'Super Admin IT RW 03',
+    userId: 'usr-it-rw03',
+    nama: 'IT RW 03',
     email: 'admin@kebonkangkung.id',
     nomorHP: '081226017803',
     NIK: '3273162601780003',
     password: 'SuperAdmin#2026',
-    role: 'super_admin',
-    jabatan: 'Pengelola IT RW 03',
-    RT: '01',
-    RW: '03',
-    alamat: 'Kantor Sekretariat RW 03 Kebon Kangkung',
-    statusAkun: 'aktif',
-    createdAt: '2026-01-01 00:00',
-    updatedAt: '2026-09-26 19:00'
-  },
-  {
-    userId: 'usr-it-rw03',
-    nama: 'IT RW 03',
-    email: 'it.rw03@kebonkangkung.id',
-    nomorHP: '081226017803',
-    NIK: '3273162601780003',
-    password: 'Randu#106',
     role: 'super_admin',
     jabatan: 'Pengelola IT RW 03',
     RT: '01',
