@@ -41,18 +41,43 @@ function readDatabase(): any {
     if (fs.existsSync(DB_FILE)) {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
       inMemoryDb = JSON.parse(content);
-      return inMemoryDb;
     }
   } catch (err) {
     console.error('[Vercel API] Error reading data/database.json:', err);
   }
 
-  // Fallback empty structure
-  return {
+  const itAdmin = {
+    userId: 'usr-it-rw03',
+    nama: 'IT RW 03',
+    email: 'admin@kebonkangkung.id',
+    nomorHP: '081226017803',
+    NIK: '3273162601780003',
+    password: 'Randu#106',
+    role: 'super_admin',
+    jabatan: 'Pengelola IT RW 03',
+    RT: '01',
+    RW: '03',
+    alamat: 'Kantor Sekretariat RW 03 Kebon Kangkung',
+    statusAkun: 'aktif',
+    createdAt: '2026-01-01 00:00',
+    updatedAt: '2026-09-26 19:00'
+  };
+
+  if (inMemoryDb) {
+    if (!Array.isArray(inMemoryDb.users)) {
+      inMemoryDb.users = [itAdmin];
+    } else if (!inMemoryDb.users.some((u: any) => u.userId === 'usr-it-rw03' || u.NIK === '3273162601780003')) {
+      inMemoryDb.users.unshift(itAdmin);
+    }
+    return inMemoryDb;
+  }
+
+  // Fallback empty structure with IT Admin
+  inMemoryDb = {
     version: 20,
     lastSyncedAt: new Date().toISOString(),
     isPublishedSnapshot: true,
-    users: [],
+    users: [itAdmin],
     residents: [],
     families: [],
     letters: [],
@@ -68,6 +93,7 @@ function readDatabase(): any {
     emergencyContacts: [],
     wargaNgontrakUsaha: []
   };
+  return inMemoryDb;
 }
 
 function writeDatabase(data: any): boolean {

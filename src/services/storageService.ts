@@ -489,16 +489,26 @@ export class StorageService {
       changed = true;
     }
 
+    // Pastikan akun IT ADMIN tidak pernah terhapus atau diblokir
+    if (deletedUserIds.includes('usr-it-rw03') || deletedUserIds.includes('3273162601780003')) {
+      const cleanDeleted = deletedUserIds.filter(id => id !== 'usr-it-rw03' && id !== '3273162601780003');
+      setStorage(STORAGE_KEYS.DELETED_USERS, cleanDeleted);
+    }
+
     if (deletedUserIds.length > 0) {
       const prevLen = list.length;
-      list = list.filter(u => !deletedUserIds.includes(u.userId) && (!u.NIK || u.NIK === '-' || !deletedUserIds.includes(u.NIK)));
+      list = list.filter(u => {
+        if (u.userId === 'usr-it-rw03' || u.NIK === '3273162601780003') return true;
+        return !deletedUserIds.includes(u.userId) && (!u.NIK || u.NIK === '-' || !deletedUserIds.includes(u.NIK));
+      });
       if (list.length !== prevLen) {
         changed = true;
       }
     }
 
     for (const u of INITIAL_USERS) {
-      if (deletedUserIds.includes(u.userId) || (u.NIK && u.NIK !== '-' && deletedUserIds.includes(u.NIK))) {
+      const isItAdmin = u.userId === 'usr-it-rw03' || u.NIK === '3273162601780003';
+      if (!isItAdmin && (deletedUserIds.includes(u.userId) || (u.NIK && u.NIK !== '-' && deletedUserIds.includes(u.NIK)))) {
         continue;
       }
       const idx = list.findIndex(existing => existing.userId === u.userId || existing.NIK === u.NIK);
@@ -526,6 +536,13 @@ export class StorageService {
         }
       }
     }
+
+    // Pastikan IT Admin mutlak ada dalam list
+    if (!list.some(u => u.userId === 'usr-it-rw03' || u.NIK === '3273162601780003')) {
+      list.unshift(INITIAL_USERS[0]);
+      changed = true;
+    }
+
     if (changed) {
       setStorage(STORAGE_KEYS.USERS, list);
     }
@@ -565,6 +582,12 @@ export class StorageService {
     const list = this.getUsers();
     const target = list.find(u => u.userId === userId || (u.NIK && u.NIK !== '-' && u.NIK === userId));
     if (!target) return false;
+
+    // Larang penghapusan akun IT Admin
+    if (target.userId === 'usr-it-rw03' || target.NIK === '3273162601780003' || target.role === 'super_admin') {
+      console.warn('[StorageService] Akun IT Admin tidak boleh dihapus.');
+      return false;
+    }
 
     // 1. Simpan ke daftar ID/NIK terhapus permanen agar tidak pernah muncul lagi dari seed maupun cache
     const deletedUserIds = this.getDeletedUserIds();

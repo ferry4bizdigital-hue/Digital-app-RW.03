@@ -33,15 +33,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   const isVercelDeploy = typeof window !== 'undefined' && (
     window.location.hostname.includes('vercel.app') ||
-    window.location.hostname.includes('vercel.dev')
+    window.location.hostname.includes('vercel.dev') ||
+    window.location.hostname.includes('vercel') ||
+    import.meta.env.PROD
   );
 
   const handleNormalLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanInput = emailOrNik.trim();
+    const rawInput = emailOrNik.trim();
+    const cleanInput = rawInput.replace(/\s+/g, '');
     const cleanPass = password.trim();
 
-    if (!cleanInput || !cleanPass) {
+    if (!rawInput || !cleanPass) {
       setErrorMsg('Mohon isi email/NIK dan kata sandi.');
       return;
     }
@@ -50,12 +53,41 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     const usersList = StorageService.getUsers();
 
     // Cocokkan data user dari penyimpanan berdasarkan Email, NIK, atau userId
-    const found = usersList.find(
-      u => (u.email && u.email.toLowerCase() === cleanInput.toLowerCase()) || 
-           (u.NIK && u.NIK === cleanInput) ||
-           (u.userId && u.userId.toLowerCase() === cleanInput.toLowerCase()) ||
-           (u.role === 'super_admin' && (cleanInput === '3273162601780003' || cleanInput.toLowerCase() === 'admin@kebonkangkung.id' || cleanInput.toLowerCase() === 'it.rw03@kebonkangkung.id'))
+    let found = usersList.find(
+      u => (u.email && u.email.toLowerCase() === rawInput.toLowerCase()) || 
+           (u.NIK && (u.NIK === rawInput || u.NIK.replace(/\s+/g, '') === cleanInput)) ||
+           (u.userId && u.userId.toLowerCase() === rawInput.toLowerCase()) ||
+           (u.role === 'super_admin' && (
+             cleanInput === '3273162601780003' || 
+             rawInput.toLowerCase() === 'admin@kebonkangkung.id' || 
+             rawInput.toLowerCase() === 'it.rw03@kebonkangkung.id'
+           ))
     );
+
+    // Safeguard mutlak untuk IT ADMIN jika data belum termuat dari server
+    if (!found && (
+      cleanInput === '3273162601780003' || 
+      rawInput.toLowerCase() === 'admin@kebonkangkung.id' || 
+      rawInput.toLowerCase() === 'it.rw03@kebonkangkung.id'
+    )) {
+      found = {
+        userId: 'usr-it-rw03',
+        nama: 'IT RW 03',
+        email: 'admin@kebonkangkung.id',
+        nomorHP: '081226017803',
+        NIK: '3273162601780003',
+        password: 'Randu#106',
+        role: 'super_admin',
+        jabatan: 'Pengelola IT RW 03',
+        RT: '01',
+        RW: '03',
+        alamat: 'Kantor Sekretariat RW 03 Kebon Kangkung',
+        statusAkun: 'aktif',
+        createdAt: '2026-01-01 00:00',
+        updatedAt: '2026-09-26 19:00'
+      };
+      StorageService.addUser(found);
+    }
 
     if (found) {
       const isItAdmin = found.role === 'super_admin' || found.userId === 'usr-it-rw03' || found.NIK === '3273162601780003';
@@ -69,9 +101,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       }
 
       // Pastikan password akun IT Admin tersinkronkan ke Randu#106 jika sebelumnya berbeda
-      if (isItAdmin && found.password !== cleanPass && (cleanPass === 'Randu#106' || cleanPass === 'SuperAdmin#2026')) {
-        found.password = cleanPass;
-        StorageService.updateUser(found.userId, { password: cleanPass });
+      if (isItAdmin && found.password !== 'Randu#106') {
+        found.password = 'Randu#106';
+        StorageService.updateUser(found.userId, { password: 'Randu#106' });
       }
 
       StorageService.setCurrentUser(found);
@@ -233,18 +265,39 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }, 1200);
   };
 
-  const handleDirectRolePlay = (userTarget: User, pass: string) => {
-    setEmailOrNik(userTarget.NIK || userTarget.email);
-    setPassword(pass);
-    setErrorMsg('');
-    StorageService.setCurrentUser(userTarget);
-    onLoginSuccess(userTarget);
-  };
+  const handleLoginAsItAdmin = () => {
+    const currentList = StorageService.getUsers();
+    let itAdmin = currentList.find(
+      u => u.role === 'super_admin' || u.userId === 'usr-it-rw03' || u.NIK === '3273162601780003'
+    );
+    if (!itAdmin) {
+      itAdmin = {
+        userId: 'usr-it-rw03',
+        nama: 'IT RW 03',
+        email: 'admin@kebonkangkung.id',
+        nomorHP: '081226017803',
+        NIK: '3273162601780003',
+        password: 'Randu#106',
+        role: 'super_admin',
+        jabatan: 'Pengelola IT RW 03',
+        RT: '01',
+        RW: '03',
+        alamat: 'Kantor Sekretariat RW 03 Kebon Kangkung',
+        statusAkun: 'aktif',
+        createdAt: '2026-01-01 00:00',
+        updatedAt: '2026-09-26 19:00'
+      };
+      StorageService.addUser(itAdmin);
+    } else if (itAdmin.password !== 'Randu#106') {
+      itAdmin = { ...itAdmin, password: 'Randu#106' };
+      StorageService.updateUser(itAdmin.userId, { password: 'Randu#106' });
+    }
 
-  const handleFillCredentials = (identifier: string, pass: string) => {
-    setEmailOrNik(identifier);
-    setPassword(pass);
+    setEmailOrNik('3273162601780003');
+    setPassword('Randu#106');
     setErrorMsg('');
+    StorageService.setCurrentUser(itAdmin);
+    onLoginSuccess(itAdmin);
   };
 
   return (
@@ -343,84 +396,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 </button>
               </div>
 
-              {/* Role Play & Akses Cepat Akun Pengurus (Tersedia di Vercel & Lingkungan Apapun) */}
-              <div className="pt-3 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                    Role Play & Akses Cepat Pengurus
-                  </span>
-                  <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    IT Admin Siap
-                  </span>
-                </div>
-
-                {/* Tombol Utama: Role Play IT Admin (Super Admin) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const currentList = StorageService.getUsers();
-                    const itAdmin = currentList.find(u => u.role === 'super_admin' || u.userId === 'usr-it-rw03') || {
-                      userId: 'usr-it-rw03',
-                      nama: 'IT RW 03',
-                      email: 'admin@kebonkangkung.id',
-                      nomorHP: '081226017803',
-                      NIK: '3273162601780003',
-                      password: 'Randu#106',
-                      role: 'super_admin' as const,
-                      jabatan: 'Pengelola IT RW 03',
-                      RT: '01',
-                      RW: '03',
-                      alamat: 'Kantor Sekretariat RW 03 Kebon Kangkung',
-                      statusAkun: 'aktif' as const,
-                      createdAt: '2026-01-01 00:00',
-                      updatedAt: '2026-09-26 19:00'
-                    };
-                    handleDirectRolePlay(itAdmin, 'Randu#106');
-                  }}
-                  className="w-full mb-2 p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/80 hover:bg-emerald-100 text-left transition-all text-xs cursor-pointer flex items-center justify-between shadow-xs group"
-                >
-                  <div className="min-w-0 pr-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-emerald-950">Role Play IT Admin (Super Admin)</span>
-                      <span className="text-[9px] bg-emerald-700 text-white font-bold px-1.5 py-0.5 rounded">MASUK LANGSUNG</span>
+              {/* Role Play IT Admin: Disembunyikan saat deploy di Vercel demi keamanan dan privasi */}
+              {!isVercelDeploy && (
+                <div className="pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleLoginAsItAdmin}
+                    className="w-full p-2.5 rounded-xl border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100 text-left transition-all text-xs cursor-pointer flex items-center justify-between shadow-2xs group"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-emerald-950">Role Play IT Admin</span>
+                        <span className="text-[9px] bg-emerald-700 text-white font-bold px-1.5 py-0.5 rounded">MASUK LANGSUNG</span>
+                      </div>
+                      <span className="text-[10px] text-emerald-800 font-mono block mt-0.5 font-medium">
+                        NIK: 3273162601780003 • Sandi: Randu#106
+                      </span>
                     </div>
-                    <span className="text-[11px] text-emerald-800 font-mono block mt-0.5 font-medium">
-                      NIK: 3273162601780003 • Sandi: Randu#106
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-emerald-700 group-hover:translate-x-1 transition-transform shrink-0" />
-                </button>
-
-                {/* Akses Cepat Pengurus Lainnya */}
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleFillCredentials('bambang.rw03@kebonkangkung.id', 'Rw03#Bambang')}
-                    className="p-1.5 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-800 block truncate">Ketua RW 03</span>
-                    <span className="text-[10px] text-slate-400 truncate block">bambang...</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleFillCredentials('bendahara.rw03@kebonkangkung.id', 'Bendahara#Rw03')}
-                    className="p-1.5 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-800 block truncate">Bendahara RW</span>
-                    <span className="text-[10px] text-slate-400 truncate block">bendahara...</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleFillCredentials('rahmat.rt01@kebonkangkung.id', 'Rt01#Rahmat')}
-                    className="p-1.5 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-800 block truncate">Ketua RT 01</span>
-                    <span className="text-[10px] text-slate-400 truncate block">rahmat...</span>
+                    <ArrowRight className="w-4 h-4 text-emerald-700 group-hover:translate-x-1 transition-transform shrink-0" />
                   </button>
                 </div>
-              </div>
+              )}
             </form>
           )}
 
