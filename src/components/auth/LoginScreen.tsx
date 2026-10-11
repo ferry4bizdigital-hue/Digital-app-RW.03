@@ -194,6 +194,66 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   Daftar Akun Baru
                 </button>
               </div>
+
+              {/* Quick Fill / Demo Accounts for Vercel & Testing */}
+              <div className="pt-3 border-t border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-2 text-center">
+                  Masuk Cepat Akun Pengurus (Uji Coba)
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailOrNik('admin@kebonkangkung.id');
+                      setPassword('SuperAdmin#2026');
+                      setErrorMsg('');
+                    }}
+                    className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
+                  >
+                    <span className="font-bold text-slate-800 block">Super Admin IT</span>
+                    <span className="text-[10px] text-slate-400">admin@...</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailOrNik('bambang.rw03@kebonkangkung.id');
+                      setPassword('Rw03#Bambang');
+                      setErrorMsg('');
+                    }}
+                    className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
+                  >
+                    <span className="font-bold text-slate-800 block">Ketua RW 03</span>
+                    <span className="text-[10px] text-slate-400">bambang...</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailOrNik('bendahara.rw03@kebonkangkung.id');
+                      setPassword('Bendahara#Rw03');
+                      setErrorMsg('');
+                    }}
+                    className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
+                  >
+                    <span className="font-bold text-slate-800 block">Bendahara RW</span>
+                    <span className="text-[10px] text-slate-400">bendahara...</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailOrNik('rahmat.rt01@kebonkangkung.id');
+                      setPassword('Rt01#Rahmat');
+                      setErrorMsg('');
+                    }}
+                    className="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-colors text-[11px] cursor-pointer"
+                  >
+                    <span className="font-bold text-slate-800 block">Ketua RT 01</span>
+                    <span className="text-[10px] text-slate-400">rahmat...</span>
+                  </button>
+                </div>
+              </div>
             </form>
           )}
 

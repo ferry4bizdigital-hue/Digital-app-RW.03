@@ -29,6 +29,11 @@ Aplikasi ini telah dikonfigurasi secara lengkap untuk siap di-deploy langsung ke
 4. **`package.json`**
    - Ditambahkan script `"vercel-build": "vite build"`.
 
+5. **Tampilan Awal Login di Vercel (`src/App.tsx`)**
+   - Saat aplikasi dibuka di domain Vercel (`*.vercel.app`), pengguna akan **langsung diarahkan ke Halaman Login (`LoginScreen`)**.
+   - Tersedia tombol cepat akun pengurus (Super Admin IT, Ketua RW, Bendahara, Ketua RT 01) serta form registrasi warga baru mandiri.
+   - Sesi login tetap tersimpan selama tab browser aktif, dan jika pengguna mengklik "Keluar", tampilan akan kembali ke halaman Login.
+
 ---
 
 ## 🚀 Cara Deploy ke Vercel

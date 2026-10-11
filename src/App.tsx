@@ -32,7 +32,22 @@ import { ModulGoogleDrive } from './components/drive/ModulGoogleDrive';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User>(() => StorageService.getCurrentUser());
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    
+    const hostname = window.location.hostname.toLowerCase();
+    const isVercel = hostname.includes('vercel.app') || hostname.includes('vercel.dev');
+    
+    // Saat di-deploy ke Vercel atau dibuka pengguna baru, tampilan default adalah Login Screen
+    // Kecuali pengguna sudah berhasil login dalam sesi aktif browser saat ini
+    const sessionActive = sessionStorage.getItem('rw03_is_logged_in') === 'true';
+    if (isVercel) {
+      return sessionActive;
+    }
+
+    // Cek sesi aktif untuk lingkungan lainnya
+    return sessionActive;
+  });
   const [activeTab, setActiveTab] = useState<ActiveTab>('beranda');
   const [isMobileFrame, setIsMobileFrame] = useState(false);
   const [isArchModalOpen, setIsArchModalOpen] = useState(false);
@@ -72,11 +87,18 @@ export default function App() {
 
   const handleLogout = () => {
     setIsLoggedIn(false);
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('rw03_is_logged_in');
+      localStorage.removeItem('rw03_is_logged_in');
+    }
   };
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
     setIsLoggedIn(true);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('rw03_is_logged_in', 'true');
+    }
     setActiveTab('beranda');
   };
 
