@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default fallback deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Public community data snapshots and real-time synchronization
+    // Allows all roles (IT Admin, Ketua RW, Bendahara, Ketua RT 01-05, Warga)
+    // and public visitors to synchronize and access live community data online
+    match /system/{systemId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Individual collections synchronization
+    match /community_collections/{collectionName} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    match /residents/{residentId} {
+      allow read, write: if true;
+    }
+
+    match /families/{familyId} {
+      allow read, write: if true;
+    }
+
+    match /letters/{letterId} {
+      allow read, write: if true;
+    }
+
+    match /announcements/{announcementId} {
+      allow read, write: if true;
+    }
+
+    match /events/{eventId} {
+      allow read, write: if true;
+    }
+
+    match /complaints/{complaintId} {
+      allow read, write: if true;
+    }
+
+    match /dues/{dueId} {
+      allow read, write: if true;
+    }
+
+    match /transactions/{transactionId} {
+      allow read, write: if true;
+    }
+
+    match /inventory/{itemId} {
+      allow read, write: if true;
+    }
+
+    match /emergency_contacts/{contactId} {
+      allow read, write: if true;
+    }
+  }
+}

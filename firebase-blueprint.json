@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "systemSnapshot": {
+      "title": "SystemSnapshot",
+      "description": "Consolidated database snapshot containing all synced community data for RW 03 Kebon Kangkung across all roles and public views",
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "number",
+          "description": "Incremental synchronization version"
+        },
+        "lastSyncedAt": {
+          "type": "string",
+          "description": "ISO timestamp of the most recent sync"
+        },
+        "lastPublishedAt": {
+          "type": "string",
+          "description": "ISO timestamp of the most recent public publish"
+        },
+        "isPublishedSnapshot": {
+          "type": "boolean",
+          "description": "Flag indicating if the snapshot is publicly available"
+        },
+        "data": {
+          "type": "string",
+          "description": "Serialized or nested JSON data payload containing all community entities"
+        }
+      },
+      "required": ["version", "lastSyncedAt"]
+    },
+    "communityData": {
+      "title": "CommunityData",
+      "description": "Entity collection items for RW 03 Kebon Kangkung",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      },
+      "required": ["id"]
+    }
+  },
+  "firestore": {
+    "/system/{systemId}": {
+      "schema": "systemSnapshot",
+      "description": "System synchronization states and public data snapshots for RW 03 Kebon Kangkung"
+    },
+    "/community_collections/{collectionName}": {
+      "schema": "communityData",
+      "description": "Real-time records for all community roles"
+    }
+  }
+}

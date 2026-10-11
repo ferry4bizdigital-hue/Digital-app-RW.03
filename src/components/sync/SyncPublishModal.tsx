@@ -131,7 +131,7 @@ export const SyncPublishModal: React.FC<SyncPublishModalProps> = ({ isOpen, onCl
       if (res.success) {
         setFeedback({
           type: 'success',
-          message: 'Berhasil! Seluruh data input dan demo saat ini telah disinkronkan & dipublikasikan ke server cloud publik.'
+          message: 'Berhasil! Seluruh data input dari semua Role telah disinkronkan & dipublikasikan secara online ke Cloud Firestore dan deploy Vercel publik.'
         });
         await fetchServerStatus();
       } else {
@@ -285,13 +285,13 @@ export const SyncPublishModal: React.FC<SyncPublishModalProps> = ({ isOpen, onCl
             <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse mt-1 shrink-0" />
             <div className="flex-1 text-xs text-emerald-900">
               <div className="font-bold flex items-center gap-1.5 text-emerald-950">
-                <span>Status Sinkronisasi Server:</span>
+                <span>Status Sinkronisasi Online:</span>
                 <span className="text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md font-semibold">
-                  {syncStatus.isOnline ? 'Online & Terhubung' : 'Offline'}
+                  {syncStatus.isOnline ? 'Online & Terhubung ke Cloud Database' : 'Offline'}
                 </span>
               </div>
               <p className="mt-1 text-slate-600 leading-relaxed">
-                Semua data yang Anda input (warga baru, KK, kas, iuran, surat, dsb) secara otomatis disinkronkan ke server database pusat. Klik tombol sinkronisasi di bawah untuk memastikan tautan hasil publikasi (shared link) memuat data yang sama persis.
+                Semua data yang diinput oleh semua Role (Warga, Pengurus RT 01-05, Bendahara, Ketua RW, dan IT Admin) disinkronkan secara online ke Cloud Database (Firestore) dan deploy Vercel publik. Siapapun yang mengakses tautan publik akan melihat data yang telah disinkronkan secara terpadu.
               </p>
               <div className="mt-2 text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
                 <span>Waktu Terakhir Disinkronkan:</span>

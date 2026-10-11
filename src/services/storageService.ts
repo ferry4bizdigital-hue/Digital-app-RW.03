@@ -17,6 +17,7 @@ import {
   WargaNgontrakUsaha,
   SetoranRtChoice
 } from '../types';
+import { FirestoreSyncService } from './firestoreSyncService';
 
 import {
   INITIAL_USERS,
@@ -88,6 +89,7 @@ if (typeof window !== 'undefined' && window.localStorage) {
 
 function getStorage<T>(key: string, fallback: T): T {
   try {
+    if (typeof window === 'undefined' || !window.localStorage) return fallback;
     let raw = localStorage.getItem(key);
     if (!raw) return fallback;
     if (raw.includes('Kebonkangkung')) {
@@ -114,10 +116,13 @@ function getStorage<T>(key: string, fallback: T): T {
   }
 }
 
-function setStorage<T>(key: string, data: T): void {
+function setStorage<T>(key: string, data: T, triggerAutoSync: boolean = true): void {
   try {
-    localStorage.setItem(key, JSON.stringify(data));
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
     if (
+      triggerAutoSync &&
       key !== STORAGE_KEYS.IS_OFFLINE && 
       key !== STORAGE_KEYS.CURRENT_USER && 
       key !== STORAGE_KEYS.LAST_SYNCED_AT && 
@@ -219,12 +224,29 @@ export class StorageService {
   public static applyServerData(serverData: Record<string, any>): void {
     if (!serverData) return;
 
+    // Helper to merge arrays without duplicate IDs while preserving local un-synced items
+    const mergeItems = <T>(serverArr: T[] | undefined, localArr: T[], idGetter: (item: T) => string): T[] => {
+      if (!Array.isArray(serverArr)) return localArr;
+      const map = new Map<string, T>();
+      serverArr.forEach(item => {
+        const id = idGetter(item);
+        if (id) map.set(id, item);
+      });
+      localArr.forEach(item => {
+        const id = idGetter(item);
+        if (id && !map.has(id)) {
+          map.set(id, item);
+        }
+      });
+      return Array.from(map.values());
+    };
+
+    // 1. Pengguna (Users)
     if (Array.isArray(serverData.users) && serverData.users.length > 0) {
       const currentUsers = getStorage<User[]>(STORAGE_KEYS.USERS, []);
       const deletedUserIds = this.getDeletedUserIds();
       const map = new Map<string, User>();
 
-      // Muat pengguna dari data server
       serverData.users.forEach((u: User) => {
         if (!deletedUserIds.includes(u.userId) && (!u.NIK || u.NIK === '-' || !deletedUserIds.includes(u.NIK))) {
           map.set(u.userId, u);
@@ -234,7 +256,7 @@ export class StorageService {
         }
       });
 
-      // Pertahankan akun warga yang baru didaftarkan secara mandiri di browser lokal agar tidak terhapus saat sync
+      // Pertahankan akun warga yang didaftarkan mandiri di browser lokal
       currentUsers.forEach((u: User) => {
         if (!deletedUserIds.includes(u.userId) && (!u.NIK || u.NIK === '-' || !deletedUserIds.includes(u.NIK))) {
           const byId = map.get(u.userId);
@@ -245,11 +267,33 @@ export class StorageService {
         }
       });
 
-      setStorage(STORAGE_KEYS.USERS, Array.from(new Set(map.values())));
+      // Pastikan IT Admin selalu ada
+      const itAdmin = {
+        userId: 'usr-it-rw03',
+        nama: 'IT RW 03',
+        email: 'admin@kebonkangkung.id',
+        nomorHP: '081226017803',
+        NIK: '3273162601780003',
+        password: 'Randu#106',
+        role: 'super_admin' as const,
+        jabatan: 'Pengelola IT RW 03',
+        RT: '01',
+        RW: '03',
+        alamat: 'Kantor Sekretariat RW 03 Kebon Kangkung',
+        statusAkun: 'aktif' as const,
+        createdAt: '2026-01-01 00:00',
+        updatedAt: '2026-09-26 19:00'
+      };
+      if (!map.has('usr-it-rw03')) {
+        map.set('usr-it-rw03', itAdmin);
+      }
+
+      setStorage(STORAGE_KEYS.USERS, Array.from(new Set(map.values())), false);
     }
 
-    if (Array.isArray(serverData.deletedUsers)) setStorage(STORAGE_KEYS.DELETED_USERS, serverData.deletedUsers);
+    if (Array.isArray(serverData.deletedUsers)) setStorage(STORAGE_KEYS.DELETED_USERS, serverData.deletedUsers, false);
 
+    // 2. Warga (Residents)
     if (Array.isArray(serverData.residents)) {
       const currentResidents = getStorage<Resident[]>(STORAGE_KEYS.RESIDENTS, []);
       const deletedResidents = this.getDeletedResidentIds();
@@ -272,25 +316,123 @@ export class StorageService {
         }
       });
 
-      setStorage(STORAGE_KEYS.RESIDENTS, Array.from(new Set(map.values())));
+      setStorage(STORAGE_KEYS.RESIDENTS, Array.from(new Set(map.values())), false);
     }
 
-    if (Array.isArray(serverData.deletedResidents)) setStorage(STORAGE_KEYS.DELETED_RESIDENTS, serverData.deletedResidents);
-    if (Array.isArray(serverData.families)) setStorage(STORAGE_KEYS.FAMILIES, serverData.families);
-    if (Array.isArray(serverData.deletedFamilies)) setStorage(STORAGE_KEYS.DELETED_FAMILIES, serverData.deletedFamilies);
-    if (Array.isArray(serverData.letters)) setStorage(STORAGE_KEYS.LETTERS, serverData.letters);
-    if (Array.isArray(serverData.announcements)) setStorage(STORAGE_KEYS.ANNOUNCEMENTS, serverData.announcements);
-    if (Array.isArray(serverData.events)) setStorage(STORAGE_KEYS.EVENTS, serverData.events);
-    if (Array.isArray(serverData.complaints)) setStorage(STORAGE_KEYS.COMPLAINTS, serverData.complaints);
-    if (Array.isArray(serverData.dues)) setStorage(STORAGE_KEYS.DUES, serverData.dues);
-    if (Array.isArray(serverData.transactions)) setStorage(STORAGE_KEYS.TRANSACTIONS, serverData.transactions);
-    if (Array.isArray(serverData.setoranRt)) setStorage(STORAGE_KEYS.SETORAN_RT, serverData.setoranRt);
-    if (Array.isArray(serverData.inventory)) setStorage(STORAGE_KEYS.INVENTORY, serverData.inventory);
-    if (Array.isArray(serverData.notifications)) setStorage(STORAGE_KEYS.NOTIFICATIONS, serverData.notifications);
-    if (Array.isArray(serverData.auditLogs)) setStorage(STORAGE_KEYS.AUDIT_LOGS, serverData.auditLogs);
-    if (Array.isArray(serverData.wargaNgontrakUsaha)) setStorage(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, serverData.wargaNgontrakUsaha);
-    if (Array.isArray(serverData.emergencyContacts)) setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, serverData.emergencyContacts);
+    if (Array.isArray(serverData.deletedResidents)) setStorage(STORAGE_KEYS.DELETED_RESIDENTS, serverData.deletedResidents, false);
+
+    // 3. Kartu Keluarga (Families)
+    if (Array.isArray(serverData.families)) {
+      const currentFamilies = getStorage<FamilyCard[]>(STORAGE_KEYS.FAMILIES, []);
+      const mergedFamilies = mergeItems(serverData.families, currentFamilies, f => f.nomorKK);
+      setStorage(STORAGE_KEYS.FAMILIES, mergedFamilies, false);
+    }
+    if (Array.isArray(serverData.deletedFamilies)) setStorage(STORAGE_KEYS.DELETED_FAMILIES, serverData.deletedFamilies, false);
+
+    // 4. Surat Pengantar (Letters)
+    if (Array.isArray(serverData.letters)) {
+      const currentLetters = getStorage<LetterRequest[]>(STORAGE_KEYS.LETTERS, []);
+      const mergedLetters = mergeItems(serverData.letters, currentLetters, l => l.idSurat || l.id);
+      setStorage(STORAGE_KEYS.LETTERS, mergedLetters, false);
+    }
+
+    // 5. Pengumuman (Announcements)
+    if (Array.isArray(serverData.announcements)) {
+      const currentAnc = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, []);
+      const mergedAnc = mergeItems(serverData.announcements, currentAnc, a => a.id);
+      setStorage(STORAGE_KEYS.ANNOUNCEMENTS, mergedAnc, false);
+    }
+
+    // 6. Agenda Kegiatan (Events)
+    if (Array.isArray(serverData.events)) {
+      const currentEvents = getStorage<CommunityEvent[]>(STORAGE_KEYS.EVENTS, []);
+      const mergedEvents = mergeItems(serverData.events, currentEvents, e => e.id);
+      setStorage(STORAGE_KEYS.EVENTS, mergedEvents, false);
+    }
+
+    // 7. Pengaduan & Aspirasi Warga (Complaints)
+    if (Array.isArray(serverData.complaints)) {
+      const currentComp = getStorage<Complaint[]>(STORAGE_KEYS.COMPLAINTS, []);
+      const mergedComp = mergeItems(serverData.complaints, currentComp, c => c.id);
+      setStorage(STORAGE_KEYS.COMPLAINTS, mergedComp, false);
+    }
+
+    // 8. Iuran Warga (Dues)
+    if (Array.isArray(serverData.dues)) {
+      const currentDues = getStorage<DueBill[]>(STORAGE_KEYS.DUES, []);
+      const mergedDues = mergeItems(serverData.dues, currentDues, d => d.id);
+      setStorage(STORAGE_KEYS.DUES, mergedDues, false);
+    }
+
+    // 9. Transaksi Keuangan Kas (Transactions)
+    if (Array.isArray(serverData.transactions)) {
+      const currentTx = getStorage<FinancialTransaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
+      const mergedTx = mergeItems(serverData.transactions, currentTx, t => t.id);
+      setStorage(STORAGE_KEYS.TRANSACTIONS, mergedTx, false);
+    }
+
+    // 10. Setoran RT ke RW (Setoran RT)
+    if (Array.isArray(serverData.setoranRt)) {
+      const currentSetoran = getStorage<SetoranIwdRt[]>(STORAGE_KEYS.SETORAN_RT, []);
+      const mergedSetoran = mergeItems(serverData.setoranRt, currentSetoran, s => s.id);
+      setStorage(STORAGE_KEYS.SETORAN_RT, mergedSetoran, false);
+    }
+
+    // 11. Inventaris (Inventory)
+    if (Array.isArray(serverData.inventory)) {
+      const currentInv = getStorage<InventoryItem[]>(STORAGE_KEYS.INVENTORY, []);
+      const mergedInv = mergeItems(serverData.inventory, currentInv, i => i.id);
+      setStorage(STORAGE_KEYS.INVENTORY, mergedInv, false);
+    }
+
+    // 12. Notifikasi
+    if (Array.isArray(serverData.notifications)) {
+      const currentNotif = getStorage<AppNotification[]>(STORAGE_KEYS.NOTIFICATIONS, []);
+      const mergedNotif = mergeItems(serverData.notifications, currentNotif, n => n.id);
+      setStorage(STORAGE_KEYS.NOTIFICATIONS, mergedNotif, false);
+    }
+
+    // 13. Audit Logs
+    if (Array.isArray(serverData.auditLogs)) {
+      const currentLogs = getStorage<AuditLog[]>(STORAGE_KEYS.AUDIT_LOGS, []);
+      const mergedLogs = mergeItems(serverData.auditLogs, currentLogs, l => l.id);
+      setStorage(STORAGE_KEYS.AUDIT_LOGS, mergedLogs, false);
+    }
+
+    // 14. Warga Ngontrak & Tempat Usaha
+    if (Array.isArray(serverData.wargaNgontrakUsaha)) {
+      const currentWnu = getStorage<WargaNgontrakUsaha[]>(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, []);
+      const mergedWnu = mergeItems(serverData.wargaNgontrakUsaha, currentWnu, w => w.id);
+      setStorage(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, mergedWnu, false);
+    }
+
+    // 15. Kontak Darurat
+    if (Array.isArray(serverData.emergencyContacts) && serverData.emergencyContacts.length > 0) {
+      setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, serverData.emergencyContacts, false);
+    }
+
     this.notify();
+  }
+
+  private static realtimeUnsubscribe: (() => void) | null = null;
+
+  public static setupFirestoreRealtime(): void {
+    if (this.realtimeUnsubscribe) return;
+    this.realtimeUnsubscribe = FirestoreSyncService.subscribeToUpdates((payload) => {
+      if (this.isOffline()) return;
+      if (payload && payload.data) {
+        const localVer = getStorage<number>(STORAGE_KEYS.SYNC_VERSION, 1);
+        if (payload.version >= localVer) {
+          console.log('[StorageService] Real-time online update received from Firestore (v' + payload.version + ')');
+          this.applyServerData(payload.data);
+          this.lastSyncTime = payload.lastSyncedAt;
+          setStorage(STORAGE_KEYS.LAST_SYNCED_AT, this.lastSyncTime, false);
+          setStorage(STORAGE_KEYS.SYNC_VERSION, payload.version, false);
+          this.lastSyncMessage = 'Tersinkronisasi online real-time via Cloud Firestore.';
+          this.notifySync();
+        }
+      }
+    });
   }
 
   public static async pushToServer(isPublishedSnapshot: boolean = false): Promise<{ success: boolean; message: string; counts?: any }> {
@@ -300,41 +442,64 @@ export class StorageService {
     this.isSyncingInProgress = true;
     this.notifySync();
 
+    const payload = this.getAllDataPayload();
+    const currentVer = getStorage<number>(STORAGE_KEYS.SYNC_VERSION, 1);
+    const nextVer = currentVer + 1;
+
+    let firestoreSuccess = false;
+    let apiSuccess = false;
+    let counts: any = null;
+
+    // 1. Simpan ke Cloud Firestore online untuk sinkronisasi publik real-time
     try {
-      const payload = this.getAllDataPayload();
+      const fRes = await FirestoreSyncService.saveSnapshot(payload, nextVer, isPublishedSnapshot);
+      if (fRes.success) {
+        firestoreSuccess = true;
+        this.lastSyncTime = fRes.lastSyncedAt;
+        setStorage(STORAGE_KEYS.LAST_SYNCED_AT, this.lastSyncTime, false);
+        setStorage(STORAGE_KEYS.SYNC_VERSION, nextVer, false);
+      }
+    } catch (fErr) {
+      console.warn('[StorageService] Firestore saveSnapshot error:', fErr);
+    }
+
+    // 2. Simpan juga ke API backend (server.ts / api/index.ts)
+    try {
       const endpoint = isPublishedSnapshot ? '/api/data/publish' : '/api/data/sync';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: payload, isPublishedSnapshot })
       });
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+      if (res.ok) {
+        const resData = await res.json();
+        apiSuccess = true;
+        counts = resData.counts;
+        if (!firestoreSuccess && resData.version) {
+          setStorage(STORAGE_KEYS.SYNC_VERSION, resData.version, false);
+          this.lastSyncTime = resData.lastSyncedAt || new Date().toISOString();
+          setStorage(STORAGE_KEYS.LAST_SYNCED_AT, this.lastSyncTime, false);
+        }
       }
+    } catch (apiErr) {
+      console.warn('[StorageService] API push failed:', apiErr);
+    }
 
-      const resData = await res.json();
-      this.isServerConnected = true;
-      this.isSyncingInProgress = false;
-      this.lastSyncTime = resData.lastSyncedAt || new Date().toISOString();
-      setStorage(STORAGE_KEYS.LAST_SYNCED_AT, this.lastSyncTime);
-      if (resData.version) {
-        setStorage(STORAGE_KEYS.SYNC_VERSION, resData.version);
-      }
+    this.isSyncingInProgress = false;
+    this.isServerConnected = firestoreSuccess || apiSuccess;
+
+    if (firestoreSuccess || apiSuccess) {
       this.lastSyncMessage = isPublishedSnapshot 
-        ? 'Data input berhasil disinkronkan & dipublikasikan ke semua link!' 
-        : 'Data berhasil disinkronkan ke server pusat.';
+        ? 'Seluruh data input dari semua Role berhasil disinkronkan & dipublikasikan secara online ke Cloud Firestore dan link publik!' 
+        : 'Data berhasil disinkronkan ke Cloud Database pusat.';
       this.notifySync();
 
       return {
         success: true,
         message: this.lastSyncMessage,
-        counts: resData.counts
+        counts
       };
-    } catch (err: any) {
-      console.warn('[StorageService] Push to server failed:', err);
-      this.isSyncingInProgress = false;
-      this.isServerConnected = false;
+    } else {
       this.lastSyncMessage = 'Server offline sementara. Data Anda tetap aman di browser ini.';
       this.notifySync();
       return { success: false, message: this.lastSyncMessage };
@@ -346,23 +511,43 @@ export class StorageService {
     this.isSyncingInProgress = true;
     this.notifySync();
 
+    // 1. Coba ambil dari Cloud Firestore terlebih dahulu
     try {
-      const res = await fetch('/api/data');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      if (json.success && json.data) {
-        this.applyServerData(json.data);
+      const cloudSnap = await FirestoreSyncService.fetchSnapshot();
+      if (cloudSnap && cloudSnap.data) {
+        this.applyServerData(cloudSnap.data);
         this.isServerConnected = true;
         this.isSyncingInProgress = false;
-        this.lastSyncTime = json.lastSyncedAt || new Date().toISOString();
-        setStorage(STORAGE_KEYS.LAST_SYNCED_AT, this.lastSyncTime);
-        if (json.version) setStorage(STORAGE_KEYS.SYNC_VERSION, json.version);
-        this.lastSyncMessage = 'Data terbaru berhasil dimuat dari server pusat.';
+        this.lastSyncTime = cloudSnap.lastSyncedAt;
+        setStorage(STORAGE_KEYS.LAST_SYNCED_AT, this.lastSyncTime, false);
+        setStorage(STORAGE_KEYS.SYNC_VERSION, cloudSnap.version, false);
+        this.lastSyncMessage = 'Data terbaru berhasil dimuat secara online dari Cloud Firestore.';
         this.notifySync();
         return true;
       }
+    } catch (e) {
+      console.warn('[StorageService] Pull from Firestore error:', e);
+    }
+
+    // 2. Fallback ke endpoint /api/data
+    try {
+      const res = await fetch('/api/data');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          this.applyServerData(json.data);
+          this.isServerConnected = true;
+          this.isSyncingInProgress = false;
+          this.lastSyncTime = json.lastSyncedAt || new Date().toISOString();
+          setStorage(STORAGE_KEYS.LAST_SYNCED_AT, this.lastSyncTime, false);
+          if (json.version) setStorage(STORAGE_KEYS.SYNC_VERSION, json.version, false);
+          this.lastSyncMessage = 'Data terbaru berhasil dimuat dari server pusat.';
+          this.notifySync();
+          return true;
+        }
+      }
     } catch (err) {
-      console.warn('[StorageService] Pull from server failed:', err);
+      console.warn('[StorageService] Pull from server API failed:', err);
       this.isServerConnected = false;
     }
 
@@ -373,34 +558,54 @@ export class StorageService {
 
   public static async initSync(): Promise<void> {
     if (this.isOffline()) return;
+    this.isSyncingInProgress = true;
+    this.notifySync();
 
+    let syncedFromCloud = false;
+
+    // 1. Ambil data snapshot dari Cloud Firestore secara online
     try {
-      const res = await fetch('/api/data');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-
-      if (json.success && json.data) {
+      const cloudSnap = await FirestoreSyncService.fetchSnapshot();
+      if (cloudSnap && cloudSnap.data) {
+        console.log('[StorageService] Synchronized with Cloud Firestore (v' + cloudSnap.version + ')');
+        this.applyServerData(cloudSnap.data);
         this.isServerConnected = true;
-        const serverDb = json.data;
-        const localVersion = getStorage<number>(STORAGE_KEYS.SYNC_VERSION, 1);
-        const serverVersion = json.version || 1;
-
-        if (serverVersion >= localVersion) {
-          console.log('[StorageService] Applying server canonical data to local storage...');
-          this.applyServerData(serverDb);
-          this.lastSyncTime = json.lastSyncedAt || new Date().toISOString();
-          setStorage(STORAGE_KEYS.LAST_SYNCED_AT, this.lastSyncTime);
-          setStorage(STORAGE_KEYS.SYNC_VERSION, serverVersion);
-        } else {
-          await this.pushToServer(true);
-        }
-        this.notifySync();
+        this.lastSyncTime = cloudSnap.lastSyncedAt;
+        setStorage(STORAGE_KEYS.LAST_SYNCED_AT, this.lastSyncTime, false);
+        setStorage(STORAGE_KEYS.SYNC_VERSION, cloudSnap.version, false);
+        this.lastSyncMessage = 'Data semua Role tersinkronisasi online dari Cloud Firestore & Publik.';
+        syncedFromCloud = true;
       }
     } catch (e) {
-      console.warn('[StorageService] Server sync check failed:', e);
-      this.isServerConnected = false;
-      this.notifySync();
+      console.warn('[StorageService] Cloud Firestore init fetch error:', e);
     }
+
+    // 2. Fallback ke endpoint /api/data jika Firestore belum merespons
+    if (!syncedFromCloud) {
+      try {
+        const res = await fetch('/api/data');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            this.isServerConnected = true;
+            this.applyServerData(json.data);
+            this.lastSyncTime = json.lastSyncedAt || new Date().toISOString();
+            setStorage(STORAGE_KEYS.LAST_SYNCED_AT, this.lastSyncTime, false);
+            if (json.version) setStorage(STORAGE_KEYS.SYNC_VERSION, json.version, false);
+            this.lastSyncMessage = 'Data terbaru berhasil dimuat dari server.';
+            syncedFromCloud = true;
+          }
+        }
+      } catch (e) {
+        console.warn('[StorageService] Server API sync check failed:', e);
+      }
+    }
+
+    this.isSyncingInProgress = false;
+    this.notifySync();
+
+    // 3. Pasang pendengar real-time Firestore untuk sinkronisasi antar perangkat & peran
+    this.setupFirestoreRealtime();
   }
 
   public static exportDatabaseJson(): string {
@@ -2096,11 +2301,13 @@ export class StorageService {
 
   // --- NOTIFIKASI ---
   public static getNotifications(): AppNotification[] {
-    const clearedFlag = localStorage.getItem('rw03_notif_cleared_v1');
-    if (!clearedFlag) {
-      setStorage(STORAGE_KEYS.NOTIFICATIONS, []);
-      localStorage.setItem('rw03_notif_cleared_v1', 'true');
-      return [];
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const clearedFlag = localStorage.getItem('rw03_notif_cleared_v1');
+      if (!clearedFlag) {
+        setStorage(STORAGE_KEYS.NOTIFICATIONS, []);
+        localStorage.setItem('rw03_notif_cleared_v1', 'true');
+        return [];
+      }
     }
     return getStorage<AppNotification[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
   }
@@ -2341,7 +2548,9 @@ export class StorageService {
 
   // --- RESET ALL DATA TO DEMO SEED ---
   public static async resetToDemoData(): Promise<void> {
-    localStorage.clear();
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.clear();
+    }
     setStorage(STORAGE_KEYS.USERS, INITIAL_USERS);
     setStorage(STORAGE_KEYS.DELETED_USERS, []);
     setStorage(STORAGE_KEYS.CURRENT_USER, INITIAL_USERS[0]);

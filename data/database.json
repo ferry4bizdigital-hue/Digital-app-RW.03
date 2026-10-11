@@ -1,6 +1,6 @@
 {
-  "version": 1146,
-  "lastSyncedAt": "2026-10-11T16:56:39.370Z",
+  "version": 1447,
+  "lastSyncedAt": "2026-10-11T17:19:33.238Z",
   "lastPublishedAt": "2026-10-11T15:18:12.468Z",
   "isPublishedSnapshot": true,
   "users": [
@@ -147,7 +147,18 @@
   "setoranRt": [],
   "inventory": [],
   "notifications": [],
-  "auditLogs": [],
+  "auditLogs": [
+    {
+      "id": "aud-1791738010494-905",
+      "userId": "usr-it-rw03",
+      "namaUser": "IT RW 03",
+      "role": "super_admin",
+      "action": "SWITCH_USER",
+      "module": "Autentikasi",
+      "detail": "Beralih akun ke IT RW 03 (super_admin)",
+      "timestamp": "2026-10-11 17:00"
+    }
+  ],
   "emergencyContacts": [
     {
       "id": "emg-01",
