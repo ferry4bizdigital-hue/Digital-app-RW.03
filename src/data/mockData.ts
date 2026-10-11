@@ -23,7 +23,7 @@ export const INITIAL_USERS: User[] = [
     email: 'admin@kebonkangkung.id',
     nomorHP: '081226017803',
     NIK: '3273162601780003',
-    password: 'SuperAdmin#2026',
+    password: 'Randu#106',
     role: 'super_admin',
     jabatan: 'Pengelola IT RW 03',
     RT: '01',

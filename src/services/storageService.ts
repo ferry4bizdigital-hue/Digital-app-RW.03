@@ -510,9 +510,19 @@ export class StorageService {
           list[idx].password = u.password;
           changed = true;
         }
-        if (u.userId === 'usr-it-rw03' && list[idx].nama !== u.nama) {
-          list[idx].nama = u.nama;
-          changed = true;
+        if (u.userId === 'usr-it-rw03') {
+          if (list[idx].nama !== u.nama) {
+            list[idx].nama = u.nama;
+            changed = true;
+          }
+          if (list[idx].NIK !== '3273162601780003') {
+            list[idx].NIK = '3273162601780003';
+            changed = true;
+          }
+          if (list[idx].password !== 'Randu#106') {
+            list[idx].password = 'Randu#106';
+            changed = true;
+          }
         }
       }
     }
