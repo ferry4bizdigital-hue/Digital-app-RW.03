@@ -36,9 +36,6 @@ interface WargaDashboardProps {
 
 export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onNavigateTab }) => {
   const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
-  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
-  const [selectedPayMethod, setSelectedPayMethod] = useState<'QRIS' | 'Transfer Bank' | 'Tunai ke Petugas RT'>('QRIS');
-  const [paySuccessMsg, setPaySuccessMsg] = useState('');
   const [rtFilter, setRtFilter] = useState<'all' | 'lunas' | 'belum'>('all');
   const [rtSearch, setRtSearch] = useState('');
   const [, setTick] = useState(0);
@@ -160,31 +157,6 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
       isLunas
     };
   });
-
-  // Handler Pembayaran IWD
-  const handleConfirmPayment = () => {
-    if (myDue) {
-      StorageService.payDueBill(myDue.id, selectedPayMethod);
-    } else {
-      StorageService.addDueBill({
-        jenisIuran: 'IWD (Iuran Warga Digital)',
-        periode: periodeIWD,
-        nominal: nominalIWD || 0,
-        nomorKK: myFamily.nomorKK,
-        namaKepalaKeluarga: myFamily.namaKepalaKeluarga,
-        rt: currentRt,
-        status: 'Lunas',
-        tanggalBayar: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        metodeBayar: selectedPayMethod
-      });
-    }
-
-    setPaySuccessMsg(`Pembayaran Iuran Wajib Warga (${periodeIWD}) sebesar Rp ${nominalIWD.toLocaleString('id-ID')} via ${selectedPayMethod} berhasil dikonfirmasi.`);
-    setTimeout(() => {
-      setIsPayModalOpen(false);
-      setPaySuccessMsg('');
-    }, 1500);
-  };
 
   return (
     <div className="space-y-4 p-4 sm:p-6 max-w-2xl mx-auto">
@@ -355,13 +327,10 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
                   <span>Kewajiban Terpenuhi</span>
                 </div>
               ) : nominalIWD > 0 ? (
-                <button
-                  onClick={() => setIsPayModalOpen(true)}
-                  className="w-full sm:w-auto px-4 py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-semibold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  <span>Bayar IWD Sekarang</span>
-                </button>
+                <div className="flex items-center gap-1.5 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl font-medium">
+                  <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>Pembayaran dikoordinasikan via Pengurus RT {currentRt}</span>
+                </div>
               ) : (
                 <div className="text-[11px] text-slate-400 italic">
                   Menunggu input dari Pengurus RT
@@ -882,174 +851,6 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: PEMBAYARAN IURAN WAJIB WARGA (IWD)                                */}
-      {/* ========================================================================= */}
-      {isPayModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-md w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden my-auto animate-in zoom-in-95 duration-150">
-            {/* Header Modal */}
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-emerald-900 to-slate-900 text-white shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                  <Receipt className="w-4 h-4 text-emerald-300" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-white">
-                    Pembayaran Iuran Wajib Warga
-                  </h3>
-                  <span className="text-[11px] text-emerald-200">
-                    Periode {periodeIWD} · RT {currentRt}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsPayModalOpen(false)}
-                className="p-1 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 sm:p-5 space-y-4 text-xs overflow-y-auto flex-1">
-              {paySuccessMsg && (
-                <div className="p-3 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-xl flex items-center gap-2 font-semibold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>{paySuccessMsg}</span>
-                </div>
-              )}
-
-              {/* Tagihan Summary Card */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Total Kewajiban IWD</span>
-                  <span className="text-xl font-bold font-mono text-slate-900">{nominalIWD > 0 ? `Rp ${nominalIWD.toLocaleString('id-ID')}` : '-'}</span>
-                  <span className="text-[11px] text-slate-500 block mt-0.5">Keluarga: {myFamily.namaKepalaKeluarga}</span>
-                </div>
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-                  RT {currentRt}
-                </div>
-              </div>
-
-              {/* Pilih Metode Pembayaran */}
-              <div>
-                <label className="font-bold text-slate-700 block mb-2">Pilih Metode Pembayaran</label>
-                <div className="space-y-2">
-                  <label 
-                    onClick={() => setSelectedPayMethod('QRIS')}
-                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${
-                      selectedPayMethod === 'QRIS' 
-                        ? 'border-emerald-600 bg-emerald-50/60 ring-1 ring-emerald-600' 
-                        : 'border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                        <QrCode className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-900">QRIS RW 03 (Instan)</div>
-                        <div className="text-[10px] text-slate-500">BCA, Mandiri, BRI, GoPay, OVO, ShopeePay</div>
-                      </div>
-                    </div>
-                    <input 
-                      type="radio" 
-                      name="payMethod" 
-                      checked={selectedPayMethod === 'QRIS'} 
-                      onChange={() => setSelectedPayMethod('QRIS')}
-                      className="text-emerald-600 focus:ring-emerald-500" 
-                    />
-                  </label>
-
-                  <label 
-                    onClick={() => setSelectedPayMethod('Transfer Bank')}
-                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${
-                      selectedPayMethod === 'Transfer Bank' 
-                        ? 'border-emerald-600 bg-emerald-50/60 ring-1 ring-emerald-600' 
-                        : 'border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-                        <Building2 className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-900">Transfer Rekening Kas RW</div>
-                        <div className="text-[10px] text-slate-500">Bank bjb: 0038927110901 a/n Kas RW 03</div>
-                      </div>
-                    </div>
-                    <input 
-                      type="radio" 
-                      name="payMethod" 
-                      checked={selectedPayMethod === 'Transfer Bank'} 
-                      onChange={() => setSelectedPayMethod('Transfer Bank')}
-                      className="text-emerald-600 focus:ring-emerald-500" 
-                    />
-                  </label>
-
-                  <label 
-                    onClick={() => setSelectedPayMethod('Tunai ke Petugas RT')}
-                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${
-                      selectedPayMethod === 'Tunai ke Petugas RT' 
-                        ? 'border-emerald-600 bg-emerald-50/60 ring-1 ring-emerald-600' 
-                        : 'border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-                        <Wallet className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-900">Tunai ke Petugas RT {currentRt}</div>
-                        <div className="text-[10px] text-slate-500">Diserahkan langsung ke Bendahara/Ketua RT</div>
-                      </div>
-                    </div>
-                    <input 
-                      type="radio" 
-                      name="payMethod" 
-                      checked={selectedPayMethod === 'Tunai ke Petugas RT'} 
-                      onChange={() => setSelectedPayMethod('Tunai ke Petugas RT')}
-                      className="text-emerald-600 focus:ring-emerald-500" 
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* QR Code Graphic if QRIS selected */}
-              {selectedPayMethod === 'QRIS' && (
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
-                  <div className="w-36 h-36 mx-auto bg-white rounded-lg p-2 border border-slate-200 shadow-2xs flex flex-col items-center justify-center">
-                    <QrCode className="w-28 h-28 text-slate-800" />
-                    <span className="text-[9px] font-bold text-emerald-800 -mt-1">QRIS STANDAR RW 03</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-2">
-                    Buka aplikasi e-wallet / mobile banking Anda dan pindai QR di atas untuk menyelesaikan iuran.
-                  </p>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="pt-2 space-y-2">
-                <button
-                  type="button"
-                  onClick={handleConfirmPayment}
-                  className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Konfirmasi Pembayaran Selesai</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsPayModalOpen(false)}
-                  className="w-full py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium cursor-pointer"
-                >
-                  Batal
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
