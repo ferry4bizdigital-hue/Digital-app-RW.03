@@ -56,13 +56,18 @@ export const DaftarWarga: React.FC<DaftarWargaProps> = ({ currentUser }) => {
     return unsubscribe;
   }, []);
 
-  // Periksa apakah navigasi dari dashboard meminta membuka Form Tambah Warga Baru otomatis
+  // Periksa apakah navigasi dari dashboard meminta membuka Form Tambah Warga Baru otomatis atau filter kelompok usia
   React.useEffect(() => {
     const shouldOpen = sessionStorage.getItem('rw03_open_tambah_warga');
     if (shouldOpen === 'true') {
       sessionStorage.removeItem('rw03_open_tambah_warga');
       setEditingResident(undefined);
       setIsFormOpen(true);
+    }
+    const filterAge = sessionStorage.getItem('rw03_filter_age_group');
+    if (filterAge) {
+      sessionStorage.removeItem('rw03_filter_age_group');
+      setSelectedAgeGroup(filterAge);
     }
   }, []);
 
