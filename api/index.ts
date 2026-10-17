@@ -53,6 +53,63 @@ const IT_ADMIN_USER = {
   updatedAt: '2026-09-26 19:00'
 };
 
+function harmonizeFamilies(db: any): void {
+  if (!db || typeof db !== 'object') return;
+  if (!Array.isArray(db.residents)) return;
+  if (!Array.isArray(db.families)) db.families = [];
+
+  const activeResidentKks = new Set<string>();
+  db.residents.forEach((r: any) => {
+    if (r.nomorKK && r.statusWarga !== 'Meninggal' && r.statusWarga !== 'Pindah') {
+      activeResidentKks.add(r.nomorKK);
+    }
+  });
+
+  // 1. Bersihkan deletedFamilies dari nomor KK yang dimiliki warga aktif
+  if (Array.isArray(db.deletedFamilies)) {
+    db.deletedFamilies = db.deletedFamilies.filter((k: string) => !activeResidentKks.has(k));
+  }
+
+  // 2. Buang KK yang benar-benar ada di deletedFamilies
+  if (Array.isArray(db.deletedFamilies) && db.deletedFamilies.length > 0) {
+    db.families = db.families.filter((f: any) => !db.deletedFamilies.includes(f.nomorKK));
+  }
+
+  // 3. Pastikan setiap KK dari warga aktif memiliki catatan Kartu Keluarga
+  const existingKkMap = new Map<string, any>();
+  db.families.forEach((f: any) => existingKkMap.set(f.nomorKK, f));
+
+  db.residents.forEach((r: any) => {
+    if (!r.nomorKK || r.statusWarga === 'Meninggal' || r.statusWarga === 'Pindah') return;
+    const members = db.residents.filter(
+      (m: any) => m.nomorKK === r.nomorKK && m.statusWarga !== 'Meninggal' && m.statusWarga !== 'Pindah'
+    );
+    const existing = existingKkMap.get(r.nomorKK);
+    if (!existing) {
+      const kepala = members.find((m: any) => m.hubunganKeluarga === 'Kepala Keluarga') || r;
+      const rtStr = String(r.rt || '01').padStart(2, '0');
+      const newFam = {
+        nomorKK: r.nomorKK,
+        namaKepalaKeluarga: kepala.namaLengkap,
+        alamat: r.alamat || `Jl. Kebon Kangkung RT ${rtStr} / RW ${r.rw || '03'}`,
+        rt: rtStr,
+        rw: r.rw || '03',
+        nomorRumah: '01',
+        statusRumah: 'Milik Sendiri',
+        jumlahAnggota: members.length || 1,
+        createdAt: r.createdAt ? String(r.createdAt).substring(0, 10) : new Date().toISOString().substring(0, 10)
+      };
+      existingKkMap.set(r.nomorKK, newFam);
+      db.families.push(newFam);
+    } else {
+      existing.jumlahAnggota = members.length;
+      if (r.hubunganKeluarga === 'Kepala Keluarga' && existing.namaKepalaKeluarga !== r.namaLengkap) {
+        existing.namaKepalaKeluarga = r.namaLengkap;
+      }
+    }
+  });
+}
+
 async function readCloudSnapshot(): Promise<any> {
   if (!fbDb) return null;
   try {
@@ -81,6 +138,8 @@ async function readCloudSnapshot(): Promise<any> {
           data.users.unshift(IT_ADMIN_USER);
         }
 
+        harmonizeFamilies(data);
+
         inMemoryDb = data;
         return inMemoryDb;
       }
@@ -94,6 +153,7 @@ async function readCloudSnapshot(): Promise<any> {
 async function writeCloudSnapshot(data: any): Promise<boolean> {
   if (!fbDb) return false;
   try {
+    harmonizeFamilies(data);
     const nowIso = new Date().toISOString();
     await setDoc(doc(fbDb, 'system', 'database_snapshot'), {
       version: data.version || 20,
@@ -150,6 +210,7 @@ function readDatabase(): any {
     } else if (!inMemoryDb.users.some((u: any) => u.userId === 'usr-it-rw03' || u.NIK === '3273162601780003')) {
       inMemoryDb.users.unshift(IT_ADMIN_USER);
     }
+    harmonizeFamilies(inMemoryDb);
     return inMemoryDb;
   }
 
@@ -300,6 +361,7 @@ router.post('/data/sync', async (req: Request, res: Response) => {
     updatedDb.isPublishedSnapshot = true;
   }
 
+  harmonizeFamilies(updatedDb);
   writeDatabase(updatedDb);
   await writeCloudSnapshot(updatedDb);
 
@@ -366,6 +428,7 @@ router.post('/data/publish', async (req: Request, res: Response) => {
   updatedDb.isPublishedSnapshot = true;
   updatedDb.lastPublishedAt = updatedDb.lastSyncedAt;
 
+  harmonizeFamilies(updatedDb);
   writeDatabase(updatedDb);
   await writeCloudSnapshot(updatedDb);
 

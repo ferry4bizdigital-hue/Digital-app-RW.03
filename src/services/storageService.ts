@@ -199,13 +199,23 @@ export class StorageService {
   }
 
   public static getAllDataPayload(): Record<string, any> {
+    const families = this.getFamilies();
+    const residents = this.getResidents();
+    const activeResidentKks = new Set<string>();
+    residents.forEach(r => {
+      if (r.nomorKK && r.statusWarga !== 'Meninggal' && r.statusWarga !== 'Pindah') {
+        activeResidentKks.add(r.nomorKK);
+      }
+    });
+    const cleanDeletedFamilies = this.getDeletedFamilyKks().filter(k => !activeResidentKks.has(k));
+
     return {
       users: this.getUsers(),
       deletedUsers: this.getDeletedUserIds(),
-      residents: this.getResidents(),
+      residents,
       deletedResidents: this.getDeletedResidentIds(),
-      families: this.getFamilies(),
-      deletedFamilies: this.getDeletedFamilyKks(),
+      families,
+      deletedFamilies: cleanDeletedFamilies,
       letters: this.getLetters(),
       announcements: this.getAnnouncements(),
       events: this.getEvents(),
@@ -224,7 +234,7 @@ export class StorageService {
   public static applyServerData(serverData: Record<string, any>): void {
     if (!serverData || typeof serverData !== 'object') return;
 
-    // 1. Simpan daftar ID/NIK/KK yang telah dihapus secara mutlak terlebih dahulu
+    // 1. Simpan daftar ID/NIK/KK yang telah dihapus secara mutlak
     const deletedUserIds: string[] = Array.isArray(serverData.deletedUsers)
       ? serverData.deletedUsers
       : this.getDeletedUserIds();
@@ -235,10 +245,9 @@ export class StorageService {
       : this.getDeletedResidentIds();
     setStorage(STORAGE_KEYS.DELETED_RESIDENTS, deletedResidents, false);
 
-    const deletedFamilies: string[] = Array.isArray(serverData.deletedFamilies)
+    const rawDeletedFamilies: string[] = Array.isArray(serverData.deletedFamilies)
       ? serverData.deletedFamilies
       : this.getDeletedFamilyKks();
-    setStorage(STORAGE_KEYS.DELETED_FAMILIES, deletedFamilies, false);
 
     // 2. Terapkan data Pengguna (Users) - pastikan IT Admin selalu aman dan user terhapus dibuang
     if (Array.isArray(serverData.users)) {
@@ -272,12 +281,26 @@ export class StorageService {
     }
 
     // 3. Warga (Residents) - Terapkan langsung dari server snapshot, buang warga terhapus
+    let cleanResidents: Resident[] = [];
     if (Array.isArray(serverData.residents)) {
-      const cleanResidents = serverData.residents.filter((r: Resident) => {
+      cleanResidents = serverData.residents.filter((r: Resident) => {
         return !deletedResidents.includes(r.id) && (!r.NIK || !deletedResidents.includes(r.NIK));
       });
       setStorage(STORAGE_KEYS.RESIDENTS, cleanResidents, false);
+    } else {
+      cleanResidents = this.getResidents();
     }
+
+    // Nomor KK milik warga aktif TIDAK BOLEH berada di deletedFamilies
+    const activeResidentKks = new Set<string>();
+    cleanResidents.forEach(r => {
+      if (r.nomorKK && r.statusWarga !== 'Meninggal' && r.statusWarga !== 'Pindah') {
+        activeResidentKks.add(r.nomorKK);
+      }
+    });
+
+    const deletedFamilies = rawDeletedFamilies.filter(k => !activeResidentKks.has(k));
+    setStorage(STORAGE_KEYS.DELETED_FAMILIES, deletedFamilies, false);
 
     // 4. Kartu Keluarga (Families) - Terapkan langsung dari server snapshot, buang KK terhapus
     if (Array.isArray(serverData.families)) {
@@ -286,6 +309,9 @@ export class StorageService {
       });
       setStorage(STORAGE_KEYS.FAMILIES, cleanFamilies, false);
     }
+
+    // Harmonisasikan Kartu Keluarga dengan data warga secara menyeluruh
+    this.getFamilies();
 
     // 5. Surat Pengantar (Letters) - Sinkron penuh
     if (Array.isArray(serverData.letters)) {
@@ -1050,12 +1076,79 @@ export class StorageService {
     const deletedKks = this.getDeletedFamilyKks();
     let list = getStorage<FamilyCard[]>(STORAGE_KEYS.FAMILIES, []);
 
-    if (deletedKks.length > 0) {
-      const prevLen = list.length;
-      list = list.filter(f => !deletedKks.includes(f.nomorKK));
-      if (list.length !== prevLen) {
-        setStorage(STORAGE_KEYS.FAMILIES, list);
+    // 1. Ambil semua warga aktif dari database
+    const residents = this.getResidents();
+    const activeResidentKks = new Set<string>();
+    residents.forEach(r => {
+      if (r.nomorKK && r.statusWarga !== 'Meninggal' && r.statusWarga !== 'Pindah') {
+        activeResidentKks.add(r.nomorKK);
       }
+    });
+
+    // 2. Nomor KK yang memiliki warga aktif TIDAK BOLEH berada di daftar terhapus
+    let deletedKksChanged = false;
+    const cleanDeletedKks = deletedKks.filter(dkk => {
+      if (activeResidentKks.has(dkk)) {
+        deletedKksChanged = true;
+        return false;
+      }
+      return true;
+    });
+    if (deletedKksChanged) {
+      setStorage(STORAGE_KEYS.DELETED_FAMILIES, cleanDeletedKks, false);
+    }
+
+    // 3. Buang KK yang benar-benar telah dihapus
+    if (cleanDeletedKks.length > 0) {
+      list = list.filter(f => !cleanDeletedKks.includes(f.nomorKK));
+    }
+
+    // 4. Sinkronisasikan secara otomatis setiap nomor KK warga terdaftar dengan daftar Kartu Keluarga
+    let listChanged = false;
+    const existingKkMap = new Map<string, FamilyCard>();
+    list.forEach(f => {
+      existingKkMap.set(f.nomorKK, f);
+    });
+
+    residents.forEach(r => {
+      if (!r.nomorKK || r.statusWarga === 'Meninggal' || r.statusWarga === 'Pindah') return;
+
+      const membersInKk = residents.filter(
+        m => m.nomorKK === r.nomorKK && m.statusWarga !== 'Meninggal' && m.statusWarga !== 'Pindah'
+      );
+      const existingFam = existingKkMap.get(r.nomorKK);
+
+      if (!existingFam) {
+        const kepala = membersInKk.find(m => m.hubunganKeluarga === 'Kepala Keluarga') || r;
+        const normRt = this.normalizeRt(r.rt);
+        const newFam: FamilyCard = {
+          nomorKK: r.nomorKK,
+          namaKepalaKeluarga: kepala.namaLengkap,
+          alamat: r.alamat || `Jl. Kebon Kangkung RT ${normRt} / RW ${r.rw || '03'}`,
+          rt: normRt,
+          rw: r.rw || '03',
+          nomorRumah: '01',
+          statusRumah: 'Milik Sendiri',
+          jumlahAnggota: membersInKk.length || 1,
+          createdAt: r.createdAt ? r.createdAt.substring(0, 10) : new Date().toISOString().substring(0, 10)
+        };
+        existingKkMap.set(r.nomorKK, newFam);
+        list.push(newFam);
+        listChanged = true;
+      } else {
+        if (existingFam.jumlahAnggota !== membersInKk.length) {
+          existingFam.jumlahAnggota = membersInKk.length;
+          listChanged = true;
+        }
+        if (r.hubunganKeluarga === 'Kepala Keluarga' && existingFam.namaKepalaKeluarga !== r.namaLengkap) {
+          existingFam.namaKepalaKeluarga = r.namaLengkap;
+          listChanged = true;
+        }
+      }
+    });
+
+    if (listChanged) {
+      setStorage(STORAGE_KEYS.FAMILIES, list, false);
     }
 
     return list;
@@ -1188,12 +1281,29 @@ export class StorageService {
     }
 
     const families = this.getFamilies();
-    const newFamily: FamilyCard = {
-      ...family,
-      jumlahAnggota: 1,
-      createdAt: new Date().toISOString().substring(0, 10)
-    };
-    families.unshift(newFamily);
+    const existingIndex = families.findIndex(f => f.nomorKK === family.nomorKK);
+    const members = this.getFamilyMembers(family.nomorKK).filter(
+      r => r.statusWarga !== 'Meninggal' && r.statusWarga !== 'Pindah'
+    );
+    const calculatedAnggota = members.length > 0 ? members.length : 1;
+
+    let targetFamily: FamilyCard;
+    if (existingIndex >= 0) {
+      targetFamily = {
+        ...families[existingIndex],
+        ...family,
+        jumlahAnggota: calculatedAnggota
+      };
+      families[existingIndex] = targetFamily;
+    } else {
+      targetFamily = {
+        ...family,
+        jumlahAnggota: calculatedAnggota,
+        createdAt: new Date().toISOString().substring(0, 10)
+      };
+      families.unshift(targetFamily);
+    }
+
     setStorage(STORAGE_KEYS.FAMILIES, families);
 
     const cur = this.getCurrentUser();
@@ -1203,12 +1313,12 @@ export class StorageService {
       cur.role,
       'TAMBAH_KK',
       'Warga',
-      newFamily.nomorKK,
-      `Menambahkan Kartu Keluarga baru No. ${newFamily.nomorKK} an. ${newFamily.namaKepalaKeluarga}`
+      targetFamily.nomorKK,
+      `Menambahkan Kartu Keluarga baru No. ${targetFamily.nomorKK} an. ${targetFamily.namaKepalaKeluarga}`
     );
 
     this.notify();
-    return newFamily;
+    return targetFamily;
   }
 
   public static deleteFamily(nomorKK: string): boolean {
@@ -1224,6 +1334,18 @@ export class StorageService {
 
     const filtered = families.filter(f => f.nomorKK !== nomorKK);
     setStorage(STORAGE_KEYS.FAMILIES, filtered);
+
+    // Lepaskan tautan nomorKK pada warga agar KK yang dihapus tidak otomatis disintesis kembali
+    const residents = this.getResidents();
+    if (residents.some(r => r.nomorKK === nomorKK)) {
+      const updatedResidents = residents.map(r => {
+        if (r.nomorKK === nomorKK) {
+          return { ...r, nomorKK: '' };
+        }
+        return r;
+      });
+      setStorage(STORAGE_KEYS.RESIDENTS, updatedResidents);
+    }
 
     const cur = this.getCurrentUser();
     this.logAction(

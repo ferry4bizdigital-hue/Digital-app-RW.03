@@ -12,11 +12,70 @@ const isProd = process.env.NODE_ENV === 'production';
 const DB_FILE = path.resolve(__dirname, 'data', 'database.json');
 
 // Helper to safely read database
+function harmonizeFamilies(db: any): void {
+  if (!db || typeof db !== 'object') return;
+  if (!Array.isArray(db.residents)) return;
+  if (!Array.isArray(db.families)) db.families = [];
+
+  const activeResidentKks = new Set<string>();
+  db.residents.forEach((r: any) => {
+    if (r.nomorKK && r.statusWarga !== 'Meninggal' && r.statusWarga !== 'Pindah') {
+      activeResidentKks.add(r.nomorKK);
+    }
+  });
+
+  // 1. Bersihkan deletedFamilies dari nomor KK yang dimiliki warga aktif
+  if (Array.isArray(db.deletedFamilies)) {
+    db.deletedFamilies = db.deletedFamilies.filter((k: string) => !activeResidentKks.has(k));
+  }
+
+  // 2. Buang KK yang benar-benar ada di deletedFamilies
+  if (Array.isArray(db.deletedFamilies) && db.deletedFamilies.length > 0) {
+    db.families = db.families.filter((f: any) => !db.deletedFamilies.includes(f.nomorKK));
+  }
+
+  // 3. Pastikan setiap KK dari warga aktif memiliki catatan Kartu Keluarga
+  const existingKkMap = new Map<string, any>();
+  db.families.forEach((f: any) => existingKkMap.set(f.nomorKK, f));
+
+  db.residents.forEach((r: any) => {
+    if (!r.nomorKK || r.statusWarga === 'Meninggal' || r.statusWarga === 'Pindah') return;
+    const members = db.residents.filter(
+      (m: any) => m.nomorKK === r.nomorKK && m.statusWarga !== 'Meninggal' && m.statusWarga !== 'Pindah'
+    );
+    const existing = existingKkMap.get(r.nomorKK);
+    if (!existing) {
+      const kepala = members.find((m: any) => m.hubunganKeluarga === 'Kepala Keluarga') || r;
+      const rtStr = String(r.rt || '01').padStart(2, '0');
+      const newFam = {
+        nomorKK: r.nomorKK,
+        namaKepalaKeluarga: kepala.namaLengkap,
+        alamat: r.alamat || `Jl. Kebon Kangkung RT ${rtStr} / RW ${r.rw || '03'}`,
+        rt: rtStr,
+        rw: r.rw || '03',
+        nomorRumah: '01',
+        statusRumah: 'Milik Sendiri',
+        jumlahAnggota: members.length || 1,
+        createdAt: r.createdAt ? String(r.createdAt).substring(0, 10) : new Date().toISOString().substring(0, 10)
+      };
+      existingKkMap.set(r.nomorKK, newFam);
+      db.families.push(newFam);
+    } else {
+      existing.jumlahAnggota = members.length;
+      if (r.hubunganKeluarga === 'Kepala Keluarga' && existing.namaKepalaKeluarga !== r.namaLengkap) {
+        existing.namaKepalaKeluarga = r.namaLengkap;
+      }
+    }
+  });
+}
+
 function readDatabase(): any {
   try {
     if (fs.existsSync(DB_FILE)) {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      harmonizeFamilies(parsed);
+      return parsed;
     }
   } catch (err) {
     console.error('[Server] Error reading database.json:', err);
@@ -27,6 +86,7 @@ function readDatabase(): any {
 // Helper to safely write database
 function writeDatabase(data: any): boolean {
   try {
+    harmonizeFamilies(data);
     const dir = path.dirname(DB_FILE);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });

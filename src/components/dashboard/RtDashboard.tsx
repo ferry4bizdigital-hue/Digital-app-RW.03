@@ -57,9 +57,7 @@ export const RtDashboard: React.FC<RtDashboardProps> = ({ currentUser, onNavigat
   const activeComplaints = complaints.filter(c => c.status === 'Baru' || c.status === 'Diproses');
 
   // Akurasi Kartu Keluarga: sinkron dengan data warga & kartu keluarga di RT
-  const residentKkSet = new Set(residents.map(r => r.nomorKK).filter(Boolean));
-  const allKkSet = new Set([...families.map(f => f.nomorKK), ...residentKkSet]);
-  const totalKkCount = allKkSet.size;
+  const totalKkCount = families.length;
 
   // IWD RT Metrics
   const iwdTarget = rtDues.reduce((acc, curr) => acc + curr.nominal, 0);
