@@ -139,10 +139,10 @@ export const DaftarWarga: React.FC<DaftarWargaProps> = ({ currentUser }) => {
     if (currentUser.role === 'warga') return;
 
     let targetId: string | null = null;
-    const targetEditId = editId || editingResident?.id;
+    const targetEditId = editId || editingResident?.id || editingResident?.NIK;
     const effectiveRt = currentUser.role === 'pengurus_rt' 
       ? StorageService.normalizeRt(currentUser.RT) 
-      : StorageService.normalizeRt(data.rt || '02');
+      : StorageService.normalizeRt(data.rt || editingResident?.rt || '02');
     
     data.rt = effectiveRt;
 

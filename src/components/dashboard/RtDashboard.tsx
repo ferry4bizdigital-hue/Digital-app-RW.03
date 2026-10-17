@@ -139,22 +139,16 @@ export const RtDashboard: React.FC<RtDashboardProps> = ({ currentUser, onNavigat
         {/* Card 2: Kartu Keluarga (Sesuai dengan data warga) */}
         <div 
           onClick={() => {
-            if (currentUser.role === 'super_admin') {
-              onNavigateTab('kk');
-            }
+            onNavigateTab('kk');
           }}
-          className={`p-4 bg-white rounded-2xl border border-slate-200 transition-all shadow-2xs group ${
-            currentUser.role === 'super_admin' ? 'hover:border-blue-300 cursor-pointer' : 'cursor-default'
-          }`}
+          className="p-4 bg-white rounded-2xl border border-slate-200 hover:border-blue-300 transition-all shadow-2xs group cursor-pointer"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-semibold text-slate-700">Kartu Keluarga RT {rtCode}</span>
-              {currentUser.role !== 'super_admin' && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-normal">
-                  Khusus Super Admin
-                </span>
-              )}
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">
+                Lihat & Kelola
+              </span>
             </div>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
               <Home className="w-4 h-4" />

@@ -179,22 +179,13 @@ export const RwDashboard: React.FC<RwDashboardProps> = ({ currentUser, onNavigat
         {/* Total KK */}
         <div 
           onClick={() => {
-            if (activeUser.role === 'super_admin') {
-              onNavigateTab('kk');
-            }
+            onNavigateTab('kk');
           }}
-          className={`p-4 bg-white rounded-xl border border-slate-200 transition-all shadow-2xs hover:shadow-xs group ${
-            activeUser.role === 'super_admin' ? 'hover:border-emerald-300 cursor-pointer' : 'cursor-default'
-          }`}
+          className="p-4 bg-white rounded-xl border border-slate-200 transition-all shadow-2xs hover:shadow-xs group hover:border-emerald-300 cursor-pointer"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-medium">Total Kartu Keluarga</span>
-              {activeUser.role !== 'super_admin' && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-normal">
-                  Khusus Super Admin
-                </span>
-              )}
             </div>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
               <Home className="w-4 h-4" />

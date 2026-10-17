@@ -55,6 +55,23 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
   const [formStatusRumah, setFormStatusRumah] = useState<FamilyCard['statusRumah']>('Milik Sendiri');
   const [errorMsg, setErrorMsg] = useState('');
 
+  const isSuperAdmin = currentUser.role === 'super_admin';
+  const isRtRole = currentUser.role === 'pengurus_rt' || (typeof currentUser.role === 'string' && currentUser.role.toLowerCase().startsWith('rt'));
+  const isRwLeader = currentUser.role === 'ketua_rw' || currentUser.role === 'bendahara';
+  const canAccessKk = isSuperAdmin || isRtRole || isRwLeader;
+  const userRt = isRtRole 
+    ? StorageService.normalizeRt(currentUser.RT || (String(currentUser.role).match(/\d+/)?.[0] || '01'))
+    : '';
+
+  // Pastikan RT pengurus otomatis terkunci ke RT masing-masing
+  useEffect(() => {
+    if (isRtRole && userRt) {
+      setSelectedRt(userRt);
+      setFormRt(userRt);
+      setEditRt(userRt);
+    }
+  }, [currentUser.role, currentUser.RT, userRt]);
+
   // Subscribe to Storage changes
   useEffect(() => {
     const unsubscribe = StorageService.subscribe(() => {
@@ -63,8 +80,18 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
     return unsubscribe;
   }, []);
 
-  // HANYA ROLE SUPER ADMIN YANG MEMILIKI HAK AKSES MELIHAT & EDIT DATA KARTU KELUARGA (KK)
-  if (currentUser.role !== 'super_admin') {
+  // Helper untuk otorisasi edit & hapus KK: Super Admin se-RW, RT 01-05 untuk wilayah RT masing-masing
+  const canManageFamily = (fam?: FamilyCard | null): boolean => {
+    if (!fam) return false;
+    if (isSuperAdmin) return true;
+    if (isRtRole) {
+      return StorageService.normalizeRt(fam.rt) === userRt;
+    }
+    return false;
+  };
+
+  // Proteksi hak akses jika role tidak berwenang (misal Warga umum)
+  if (!canAccessKk) {
     return (
       <div className="max-w-2xl mx-auto p-6 sm:p-8 my-10 bg-white rounded-2xl border border-amber-200 shadow-sm text-center">
         <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200/60 shadow-xs">
@@ -77,7 +104,7 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
           Data Kartu Keluarga (KK) RW 03 Kebon Kangkung
         </h2>
         <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto mb-5">
-          Sesuai kebijakan hak akses sistem RW 03 Kebon Kangkung, akses untuk melihat, memeriksa, dan mengedit data Kartu Keluarga (KK) seluruh lingkungan <strong>hanya diberikan kepada role Super Admin</strong> (Pengelola IT RW 03).
+          Sesuai kebijakan hak akses sistem RW 03 Kebon Kangkung, akses untuk melihat, memeriksa, mengedit, dan menghapus data Kartu Keluarga (KK) <strong>hanya diberikan kepada role RT 01 s/d RT 05 dan Super Admin</strong>.
         </p>
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium">
           <span>Role akun Anda saat ini: <strong className="capitalize text-slate-900">{currentUser.role.replace('_', ' ')}</strong></span>
@@ -87,7 +114,12 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
   }
 
   const filteredFamilies = families.filter(f => {
-    if (selectedRt !== 'all' && f.rt !== selectedRt) return false;
+    const famRtNormalized = StorageService.normalizeRt(f.rt);
+    if (isRtRole) {
+      if (famRtNormalized !== userRt) return false;
+    } else {
+      if (selectedRt !== 'all' && famRtNormalized !== StorageService.normalizeRt(selectedRt)) return false;
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchKk = f.nomorKK.includes(q);
@@ -110,11 +142,13 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
       return;
     }
 
+    const effectiveRt = isRtRole ? StorageService.normalizeRt(currentUser.RT) : formRt;
+
     StorageService.addFamily({
       nomorKK: cleanKk,
       namaKepalaKeluarga: formKepala.trim(),
-      alamat: formAlamat.trim() || `Jl. Kebon Kangkung RT ${formRt} / RW 03`,
-      rt: formRt,
+      alamat: formAlamat.trim() || `Jl. Kebon Kangkung RT ${effectiveRt} / RW 03`,
+      rt: effectiveRt,
       rw: '03',
       nomorRumah: formNomorRumah.trim() || '01',
       statusRumah: formStatusRumah
@@ -137,7 +171,7 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
     setEditNomorKk(fam.nomorKK);
     setEditKepala(fam.namaKepalaKeluarga);
     setEditAlamat(fam.alamat);
-    setEditRt(fam.rt || '01');
+    setEditRt(isRtRole ? StorageService.normalizeRt(currentUser.RT) : (fam.rt || '01'));
     setEditNomorRumah(fam.nomorRumah || '01');
     setEditStatusRumah(fam.statusRumah || 'Milik Sendiri');
     setEditErrorMsg('');
@@ -235,23 +269,34 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Home className="w-5 h-5 text-emerald-700" />
-            <span>Data Kartu Keluarga (KK) RW 03 Kebon Kangkung</span>
+            <span>
+              {isRtRole 
+                ? `Data Kartu Keluarga (KK) RT ${userRt} / RW 03 Kebon Kangkung`
+                : 'Data Kartu Keluarga (KK) RW 03 Kebon Kangkung'}
+            </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-              Hak Akses Super Admin
+              {isSuperAdmin ? 'Super Admin' : isRtRole ? `Pengurus RT ${userRt}` : 'Pengurus RW'}
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Daftar kepala keluarga dan hubungan anggota keluarga terdaftar se-RW 03 (Kelola, Edit, dan Hapus)
+            {isRtRole 
+              ? `Daftar kepala keluarga dan hubungan anggota keluarga wilayah RT ${userRt} (Akses Lihat, Tambah, Edit, dan Hapus KK)`
+              : 'Daftar kepala keluarga dan hubungan anggota keluarga terdaftar se-RW 03 (Kelola, Edit, dan Hapus)'}
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddOpen(true)}
-          className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Tambah Kartu Keluarga</span>
-        </button>
+        {(isSuperAdmin || isRtRole) && (
+          <button
+            onClick={() => {
+              if (isRtRole) setFormRt(userRt);
+              setIsAddOpen(true);
+            }}
+            className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{isRtRole ? `Tambah KK RT ${userRt}` : 'Tambah Kartu Keluarga'}</span>
+          </button>
+        )}
       </div>
 
       {/* Search & RT Filter */}
@@ -267,18 +312,24 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
           />
         </div>
 
-        <select
-          value={selectedRt}
-          onChange={e => setSelectedRt(e.target.value)}
-          className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-        >
-          <option value="all">Semua RT (01 - 05)</option>
-          <option value="01">RT 01</option>
-          <option value="02">RT 02</option>
-          <option value="03">RT 03</option>
-          <option value="04">RT 04</option>
-          <option value="05">RT 05</option>
-        </select>
+        {isRtRole ? (
+          <div className="px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 shrink-0">
+            <span>Wilayah Pelayanan: RT {userRt}</span>
+          </div>
+        ) : (
+          <select
+            value={selectedRt}
+            onChange={e => setSelectedRt(e.target.value)}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+          >
+            <option value="all">Semua RT (01 - 05)</option>
+            <option value="01">RT 01</option>
+            <option value="02">RT 02</option>
+            <option value="03">RT 03</option>
+            <option value="04">RT 04</option>
+            <option value="05">RT 05</option>
+          </select>
+        )}
       </div>
 
       {/* Grid of Family Cards */}
@@ -304,13 +355,13 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
                     </span>
                   </div>
 
-                  {currentUser.role === 'super_admin' && (
+                  {canManageFamily(fam) && (
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         onClick={(e) => handleOpenEdit(fam, e)}
                         className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                        title="Edit Kartu Keluarga (Khusus Super Admin)"
+                        title="Edit Kartu Keluarga"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
@@ -318,7 +369,7 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
                         type="button"
                         onClick={(e) => handleOpenDelete(fam, e)}
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                        title="Hapus Kartu Keluarga (Khusus Super Admin)"
+                        title="Hapus Kartu Keluarga"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -437,13 +488,13 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
 
             <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {currentUser.role === 'super_admin' && (
+                {canManageFamily(selectedFamily) && (
                   <>
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(selectedFamily)}
                       className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Edit Data Kartu Keluarga (Khusus Super Admin)"
+                      title="Edit Data Kartu Keluarga"
                     >
                       <Edit className="w-3.5 h-3.5" />
                       <span>Edit KK</span>
@@ -452,7 +503,7 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
                       type="button"
                       onClick={() => handleOpenDelete(selectedFamily)}
                       className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Hapus Data Kartu Keluarga (Khusus Super Admin)"
+                      title="Hapus Data Kartu Keluarga"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Hapus KK</span>
@@ -643,9 +694,12 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Wilayah RT</label>
                   <select
-                    value={editRt}
+                    value={isRtRole ? userRt : editRt}
+                    disabled={isRtRole}
                     onChange={e => setEditRt(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    className={`w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
+                      isRtRole ? 'bg-slate-100 text-slate-700 font-semibold cursor-not-allowed' : ''
+                    }`}
                   >
                     <option value="01">RT 01</option>
                     <option value="02">RT 02</option>
@@ -725,7 +779,7 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
 
             <div className="text-center">
               <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded uppercase tracking-wider">
-                Aksi Khusus Super Admin
+                {isSuperAdmin ? 'Aksi Super Admin' : `Aksi Role RT ${userRt}`}
               </span>
               <h4 className="font-bold text-slate-900 text-sm mt-1">Hapus Kartu Keluarga (KK)?</h4>
               <p className="text-slate-500 mt-1 leading-relaxed">

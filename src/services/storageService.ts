@@ -963,8 +963,8 @@ export class StorageService {
 
   public static updateResident(id: string, updates: Partial<Resident>): boolean {
     const residents = this.getResidents();
-    // 1. Cari berdasarkan id, jika tidak cocok coba cari berdasarkan NIK
-    let index = residents.findIndex(r => r.id === id);
+    // 1. Cari berdasarkan id atau NIK
+    let index = residents.findIndex(r => (id && (r.id === id || r.NIK === id)));
     if (index === -1 && updates.NIK) {
       index = residents.findIndex(r => r.NIK === updates.NIK);
     }
@@ -1422,6 +1422,7 @@ export class StorageService {
     }
 
     const cur = this.getCurrentUser();
+    const actorRoleName = cur.role === 'super_admin' ? 'Super Admin' : `Pengurus RT ${cur.RT || target.rt}`;
     this.logAction(
       cur.userId,
       cur.nama,
@@ -1429,9 +1430,11 @@ export class StorageService {
       'HAPUS_WARGA',
       'Warga',
       nomorKK,
-      `Super Admin menghapus data Kartu Keluarga No. ${nomorKK} an. ${target.namaKepalaKeluarga} (RT ${target.rt}/RW ${target.rw})`
+      `${actorRoleName} menghapus data Kartu Keluarga No. ${nomorKK} an. ${target.namaKepalaKeluarga} (RT ${target.rt}/RW ${target.rw})`
     );
 
+    // Segera dorong perubahan secara permanen ke Cloud Firestore dan Vercel server
+    this.pushToServer(true).catch(err => console.warn('[StorageService] Push on deleteFamily error:', err));
     this.notify();
     return true;
   }
@@ -1490,6 +1493,7 @@ export class StorageService {
     }
 
     const cur = this.getCurrentUser();
+    const actorRoleName = cur.role === 'super_admin' ? 'Super Admin' : `Pengurus RT ${cur.RT || updatedFamily.rt}`;
     this.logAction(
       cur.userId,
       cur.nama,
@@ -1497,7 +1501,7 @@ export class StorageService {
       'EDIT_WARGA',
       'Warga',
       newNomorKk,
-      `Super Admin memperbarui data Kartu Keluarga No. ${newNomorKk} an. ${updatedFamily.namaKepalaKeluarga} (RT ${updatedFamily.rt}/RW ${updatedFamily.rw})`
+      `${actorRoleName} memperbarui data Kartu Keluarga No. ${newNomorKk} an. ${updatedFamily.namaKepalaKeluarga} (RT ${updatedFamily.rt}/RW ${updatedFamily.rw})`
     );
 
     // Langsung dorong ke Cloud Firestore dan Vercel
