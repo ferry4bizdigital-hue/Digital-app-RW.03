@@ -86,15 +86,18 @@ export class FirestoreSyncService {
 
       if (docSnap.exists()) {
         const snapData = docSnap.data();
-        let payloadData = snapData.data;
+        let payloadData: any = null;
 
-        // Mendukung penyimpanan baik berupa object map maupun JSON string terkompresi
-        if (!payloadData && snapData.dataJson) {
+        // Mendukung penyimpanan baik berupa JSON string terkompresi maupun object map
+        if (snapData.dataJson) {
           try {
             payloadData = JSON.parse(snapData.dataJson);
           } catch (e) {
             console.error('[FirestoreSyncService] Error parsing dataJson:', e);
           }
+        }
+        if (!payloadData && snapData.data) {
+          payloadData = snapData.data;
         }
 
         this.isConnected = true;
@@ -159,7 +162,7 @@ export class FirestoreSyncService {
         },
         updatedByRole: 'multi_role_sync',
         cloudPlatform: 'vercel_online'
-      }, { merge: true });
+      });
 
       this.isConnected = true;
       return {
@@ -196,14 +199,17 @@ export class FirestoreSyncService {
       const unsubscribe = onSnapshot(docRef, (docSnap) => {
         if (docSnap.exists()) {
           const snapData = docSnap.data();
-          let payloadData = snapData.data;
+          let payloadData: any = null;
 
-          if (!payloadData && snapData.dataJson) {
+          if (snapData.dataJson) {
             try {
               payloadData = JSON.parse(snapData.dataJson);
             } catch (e) {
               console.error('[FirestoreSyncService] Error parsing snapshot dataJson:', e);
             }
+          }
+          if (!payloadData && snapData.data) {
+            payloadData = snapData.data;
           }
 
           if (payloadData) {

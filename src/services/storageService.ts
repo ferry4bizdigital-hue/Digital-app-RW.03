@@ -222,192 +222,128 @@ export class StorageService {
   }
 
   public static applyServerData(serverData: Record<string, any>): void {
-    if (!serverData) return;
+    if (!serverData || typeof serverData !== 'object') return;
 
-    // Helper to merge arrays without duplicate IDs while preserving local un-synced items
-    const mergeItems = <T>(serverArr: T[] | undefined, localArr: T[], idGetter: (item: T) => string): T[] => {
-      if (!Array.isArray(serverArr)) return localArr;
-      const map = new Map<string, T>();
-      serverArr.forEach(item => {
-        const id = idGetter(item);
-        if (id) map.set(id, item);
-      });
-      localArr.forEach(item => {
-        const id = idGetter(item);
-        if (id && !map.has(id)) {
-          map.set(id, item);
-        }
-      });
-      return Array.from(map.values());
-    };
+    // 1. Simpan daftar ID/NIK/KK yang telah dihapus secara mutlak terlebih dahulu
+    const deletedUserIds: string[] = Array.isArray(serverData.deletedUsers)
+      ? serverData.deletedUsers
+      : this.getDeletedUserIds();
+    setStorage(STORAGE_KEYS.DELETED_USERS, deletedUserIds, false);
 
-    // 1. Pengguna (Users)
-    if (Array.isArray(serverData.users) && serverData.users.length > 0) {
-      const currentUsers = getStorage<User[]>(STORAGE_KEYS.USERS, []);
-      const deletedUserIds = this.getDeletedUserIds();
-      const map = new Map<string, User>();
+    const deletedResidents: string[] = Array.isArray(serverData.deletedResidents)
+      ? serverData.deletedResidents
+      : this.getDeletedResidentIds();
+    setStorage(STORAGE_KEYS.DELETED_RESIDENTS, deletedResidents, false);
 
-      serverData.users.forEach((u: User) => {
-        if (!deletedUserIds.includes(u.userId) && (!u.NIK || u.NIK === '-' || !deletedUserIds.includes(u.NIK))) {
-          map.set(u.userId, u);
-          if (u.NIK && u.NIK !== '-') {
-            map.set(`nik_${u.NIK}`, u);
-          }
-        }
+    const deletedFamilies: string[] = Array.isArray(serverData.deletedFamilies)
+      ? serverData.deletedFamilies
+      : this.getDeletedFamilyKks();
+    setStorage(STORAGE_KEYS.DELETED_FAMILIES, deletedFamilies, false);
+
+    // 2. Terapkan data Pengguna (Users) - pastikan IT Admin selalu aman dan user terhapus dibuang
+    if (Array.isArray(serverData.users)) {
+      const cleanUsers = serverData.users.filter((u: User) => {
+        if (u.userId === 'usr-it-rw03' || u.NIK === '3273162601780003') return true;
+        return !deletedUserIds.includes(u.userId) && (!u.NIK || u.NIK === '-' || !deletedUserIds.includes(u.NIK));
       });
 
-      // Pertahankan akun warga yang didaftarkan mandiri di browser lokal
-      currentUsers.forEach((u: User) => {
-        if (!deletedUserIds.includes(u.userId) && (!u.NIK || u.NIK === '-' || !deletedUserIds.includes(u.NIK))) {
-          const byId = map.get(u.userId);
-          const byNik = u.NIK && u.NIK !== '-' ? map.get(`nik_${u.NIK}`) : undefined;
-          if (!byId && !byNik) {
-            map.set(u.userId, u);
-          }
-        }
-      });
-
-      // Pastikan IT Admin selalu ada
-      const itAdmin = {
+      const itAdmin: User = {
         userId: 'usr-it-rw03',
         nama: 'IT RW 03',
         email: 'admin@kebonkangkung.id',
         nomorHP: '081226017803',
         NIK: '3273162601780003',
         password: 'Randu#106',
-        role: 'super_admin' as const,
+        role: 'super_admin',
         jabatan: 'Pengelola IT RW 03',
         RT: '01',
         RW: '03',
         alamat: 'Kantor Sekretariat RW 03 Kebon Kangkung',
-        statusAkun: 'aktif' as const,
+        statusAkun: 'aktif',
         createdAt: '2026-01-01 00:00',
         updatedAt: '2026-09-26 19:00'
       };
-      if (!map.has('usr-it-rw03')) {
-        map.set('usr-it-rw03', itAdmin);
+
+      if (!cleanUsers.some((u: User) => u.userId === 'usr-it-rw03' || u.NIK === '3273162601780003')) {
+        cleanUsers.unshift(itAdmin);
       }
 
-      setStorage(STORAGE_KEYS.USERS, Array.from(new Set(map.values())), false);
+      setStorage(STORAGE_KEYS.USERS, cleanUsers, false);
     }
 
-    if (Array.isArray(serverData.deletedUsers)) setStorage(STORAGE_KEYS.DELETED_USERS, serverData.deletedUsers, false);
-
-    // 2. Warga (Residents)
+    // 3. Warga (Residents) - Terapkan langsung dari server snapshot, buang warga terhapus
     if (Array.isArray(serverData.residents)) {
-      const currentResidents = getStorage<Resident[]>(STORAGE_KEYS.RESIDENTS, []);
-      const deletedResidents = this.getDeletedResidentIds();
-      const map = new Map<string, Resident>();
-
-      serverData.residents.forEach((r: Resident) => {
-        if (!deletedResidents.includes(r.id) && (!r.NIK || !deletedResidents.includes(r.NIK))) {
-          map.set(r.id, r);
-          if (r.NIK) map.set(`nik_${r.NIK}`, r);
-        }
+      const cleanResidents = serverData.residents.filter((r: Resident) => {
+        return !deletedResidents.includes(r.id) && (!r.NIK || !deletedResidents.includes(r.NIK));
       });
-
-      currentResidents.forEach((r: Resident) => {
-        if (!deletedResidents.includes(r.id) && (!r.NIK || !deletedResidents.includes(r.NIK))) {
-          const byId = map.get(r.id);
-          const byNik = r.NIK ? map.get(`nik_${r.NIK}`) : undefined;
-          if (!byId && !byNik) {
-            map.set(r.id, r);
-          }
-        }
-      });
-
-      setStorage(STORAGE_KEYS.RESIDENTS, Array.from(new Set(map.values())), false);
+      setStorage(STORAGE_KEYS.RESIDENTS, cleanResidents, false);
     }
 
-    if (Array.isArray(serverData.deletedResidents)) setStorage(STORAGE_KEYS.DELETED_RESIDENTS, serverData.deletedResidents, false);
-
-    // 3. Kartu Keluarga (Families)
+    // 4. Kartu Keluarga (Families) - Terapkan langsung dari server snapshot, buang KK terhapus
     if (Array.isArray(serverData.families)) {
-      const currentFamilies = getStorage<FamilyCard[]>(STORAGE_KEYS.FAMILIES, []);
-      const mergedFamilies = mergeItems(serverData.families, currentFamilies, f => f.nomorKK);
-      setStorage(STORAGE_KEYS.FAMILIES, mergedFamilies, false);
+      const cleanFamilies = serverData.families.filter((f: FamilyCard) => {
+        return !deletedFamilies.includes(f.nomorKK);
+      });
+      setStorage(STORAGE_KEYS.FAMILIES, cleanFamilies, false);
     }
-    if (Array.isArray(serverData.deletedFamilies)) setStorage(STORAGE_KEYS.DELETED_FAMILIES, serverData.deletedFamilies, false);
 
-    // 4. Surat Pengantar (Letters)
+    // 5. Surat Pengantar (Letters) - Sinkron penuh
     if (Array.isArray(serverData.letters)) {
-      const currentLetters = getStorage<LetterRequest[]>(STORAGE_KEYS.LETTERS, []);
-      const mergedLetters = mergeItems(serverData.letters, currentLetters, l => l.idSurat || l.id);
-      setStorage(STORAGE_KEYS.LETTERS, mergedLetters, false);
+      setStorage(STORAGE_KEYS.LETTERS, serverData.letters, false);
     }
 
-    // 5. Pengumuman (Announcements)
+    // 6. Pengumuman (Announcements) - Sinkron penuh
     if (Array.isArray(serverData.announcements)) {
-      const currentAnc = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, []);
-      const mergedAnc = mergeItems(serverData.announcements, currentAnc, a => a.id);
-      setStorage(STORAGE_KEYS.ANNOUNCEMENTS, mergedAnc, false);
+      setStorage(STORAGE_KEYS.ANNOUNCEMENTS, serverData.announcements, false);
     }
 
-    // 6. Agenda Kegiatan (Events)
+    // 7. Agenda Kegiatan (Events) - Sinkron penuh
     if (Array.isArray(serverData.events)) {
-      const currentEvents = getStorage<CommunityEvent[]>(STORAGE_KEYS.EVENTS, []);
-      const mergedEvents = mergeItems(serverData.events, currentEvents, e => e.id);
-      setStorage(STORAGE_KEYS.EVENTS, mergedEvents, false);
+      setStorage(STORAGE_KEYS.EVENTS, serverData.events, false);
     }
 
-    // 7. Pengaduan & Aspirasi Warga (Complaints)
+    // 8. Pengaduan & Aspirasi Warga (Complaints) - Sinkron penuh
     if (Array.isArray(serverData.complaints)) {
-      const currentComp = getStorage<Complaint[]>(STORAGE_KEYS.COMPLAINTS, []);
-      const mergedComp = mergeItems(serverData.complaints, currentComp, c => c.id);
-      setStorage(STORAGE_KEYS.COMPLAINTS, mergedComp, false);
+      setStorage(STORAGE_KEYS.COMPLAINTS, serverData.complaints, false);
     }
 
-    // 8. Iuran Warga (Dues)
+    // 9. Iuran Warga (Dues) - Sinkron penuh
     if (Array.isArray(serverData.dues)) {
-      const currentDues = getStorage<DueBill[]>(STORAGE_KEYS.DUES, []);
-      const mergedDues = mergeItems(serverData.dues, currentDues, d => d.id);
-      setStorage(STORAGE_KEYS.DUES, mergedDues, false);
+      setStorage(STORAGE_KEYS.DUES, serverData.dues, false);
     }
 
-    // 9. Transaksi Keuangan Kas (Transactions)
+    // 10. Transaksi Keuangan Kas (Transactions) - Sinkron penuh
     if (Array.isArray(serverData.transactions)) {
-      const currentTx = getStorage<FinancialTransaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
-      const mergedTx = mergeItems(serverData.transactions, currentTx, t => t.id);
-      setStorage(STORAGE_KEYS.TRANSACTIONS, mergedTx, false);
+      setStorage(STORAGE_KEYS.TRANSACTIONS, serverData.transactions, false);
     }
 
-    // 10. Setoran RT ke RW (Setoran RT)
+    // 11. Setoran RT ke RW (Setoran RT) - Sinkron penuh
     if (Array.isArray(serverData.setoranRt)) {
-      const currentSetoran = getStorage<SetoranIwdRt[]>(STORAGE_KEYS.SETORAN_RT, []);
-      const mergedSetoran = mergeItems(serverData.setoranRt, currentSetoran, s => s.id);
-      setStorage(STORAGE_KEYS.SETORAN_RT, mergedSetoran, false);
+      setStorage(STORAGE_KEYS.SETORAN_RT, serverData.setoranRt, false);
     }
 
-    // 11. Inventaris (Inventory)
+    // 12. Inventaris (Inventory) - Sinkron penuh
     if (Array.isArray(serverData.inventory)) {
-      const currentInv = getStorage<InventoryItem[]>(STORAGE_KEYS.INVENTORY, []);
-      const mergedInv = mergeItems(serverData.inventory, currentInv, i => i.id);
-      setStorage(STORAGE_KEYS.INVENTORY, mergedInv, false);
+      setStorage(STORAGE_KEYS.INVENTORY, serverData.inventory, false);
     }
 
-    // 12. Notifikasi
+    // 13. Notifikasi - Sinkron penuh
     if (Array.isArray(serverData.notifications)) {
-      const currentNotif = getStorage<AppNotification[]>(STORAGE_KEYS.NOTIFICATIONS, []);
-      const mergedNotif = mergeItems(serverData.notifications, currentNotif, n => n.id);
-      setStorage(STORAGE_KEYS.NOTIFICATIONS, mergedNotif, false);
+      setStorage(STORAGE_KEYS.NOTIFICATIONS, serverData.notifications, false);
     }
 
-    // 13. Audit Logs
+    // 14. Audit Logs - Sinkron penuh
     if (Array.isArray(serverData.auditLogs)) {
-      const currentLogs = getStorage<AuditLog[]>(STORAGE_KEYS.AUDIT_LOGS, []);
-      const mergedLogs = mergeItems(serverData.auditLogs, currentLogs, l => l.id);
-      setStorage(STORAGE_KEYS.AUDIT_LOGS, mergedLogs, false);
+      setStorage(STORAGE_KEYS.AUDIT_LOGS, serverData.auditLogs, false);
     }
 
-    // 14. Warga Ngontrak & Tempat Usaha
+    // 15. Warga Ngontrak & Tempat Usaha - Sinkron penuh
     if (Array.isArray(serverData.wargaNgontrakUsaha)) {
-      const currentWnu = getStorage<WargaNgontrakUsaha[]>(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, []);
-      const mergedWnu = mergeItems(serverData.wargaNgontrakUsaha, currentWnu, w => w.id);
-      setStorage(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, mergedWnu, false);
+      setStorage(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, serverData.wargaNgontrakUsaha, false);
     }
 
-    // 15. Kontak Darurat
-    if (Array.isArray(serverData.emergencyContacts) && serverData.emergencyContacts.length > 0) {
+    // 16. Kontak Darurat - Sinkron penuh
+    if (Array.isArray(serverData.emergencyContacts)) {
       setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, serverData.emergencyContacts, false);
     }
 
@@ -422,7 +358,7 @@ export class StorageService {
       if (this.isOffline()) return;
       if (payload && payload.data) {
         const localVer = getStorage<number>(STORAGE_KEYS.SYNC_VERSION, 1);
-        if (payload.version >= localVer) {
+        if (payload.version >= localVer || payload.isPublishedSnapshot) {
           console.log('[StorageService] Real-time online update received from Firestore (v' + payload.version + ')');
           this.applyServerData(payload.data);
           this.lastSyncTime = payload.lastSyncedAt;
@@ -856,7 +792,7 @@ export class StorageService {
 
   public static getResidents(): Resident[] {
     const deletedIds = this.getDeletedResidentIds();
-    let list = getStorage<Resident[]>(STORAGE_KEYS.RESIDENTS, INITIAL_RESIDENTS);
+    let list = getStorage<Resident[]>(STORAGE_KEYS.RESIDENTS, []);
 
     // Pastikan resident yang sudah pernah dihapus tidak muncul kembali
     if (deletedIds.length > 0) {
@@ -1112,7 +1048,7 @@ export class StorageService {
 
   public static getFamilies(): FamilyCard[] {
     const deletedKks = this.getDeletedFamilyKks();
-    let list = getStorage<FamilyCard[]>(STORAGE_KEYS.FAMILIES, INITIAL_FAMILIES);
+    let list = getStorage<FamilyCard[]>(STORAGE_KEYS.FAMILIES, []);
 
     if (deletedKks.length > 0) {
       const prevLen = list.length;
@@ -2108,12 +2044,7 @@ export class StorageService {
 
   // --- SETORAN IWD RT (BUKU KAS SETORAN RT) ---
   public static getSetoranRt(): SetoranIwdRt[] {
-    let list = getStorage<SetoranIwdRt[]>(STORAGE_KEYS.SETORAN_RT, INITIAL_SETORAN_RT);
-    if (!list || list.length === 0) {
-      list = INITIAL_SETORAN_RT;
-      setStorage(STORAGE_KEYS.SETORAN_RT, list);
-    }
-    return list;
+    return getStorage<SetoranIwdRt[]>(STORAGE_KEYS.SETORAN_RT, []);
   }
 
   public static addSetoranRt(data: Omit<SetoranIwdRt, 'id' | 'createdAt'>): SetoranIwdRt {
@@ -2160,12 +2091,7 @@ export class StorageService {
 
   // --- INVENTARIS ---
   public static getInventory(): InventoryItem[] {
-    let list = getStorage<InventoryItem[]>(STORAGE_KEYS.INVENTORY, INITIAL_INVENTORY);
-    if (!list || list.length === 0) {
-      list = INITIAL_INVENTORY;
-      setStorage(STORAGE_KEYS.INVENTORY, list);
-    }
-    return list;
+    return getStorage<InventoryItem[]>(STORAGE_KEYS.INVENTORY, []);
   }
 
   public static addInventoryItem(item: Omit<InventoryItem, 'id'>): InventoryItem {
@@ -2403,12 +2329,7 @@ export class StorageService {
 
   // --- EMERGENCY CONTACTS ---
   public static getEmergencyContacts(): EmergencyContact[] {
-    let list = getStorage<EmergencyContact[]>(STORAGE_KEYS.EMERGENCY_CONTACTS, INITIAL_EMERGENCY_CONTACTS);
-    if (!list || list.length === 0) {
-      list = INITIAL_EMERGENCY_CONTACTS;
-      setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, list);
-    }
-    return list;
+    return getStorage<EmergencyContact[]>(STORAGE_KEYS.EMERGENCY_CONTACTS, INITIAL_EMERGENCY_CONTACTS);
   }
 
   public static addEmergencyContact(item: Omit<EmergencyContact, 'id'>): EmergencyContact {
@@ -2462,12 +2383,7 @@ export class StorageService {
 
   // --- WARGA NGONTRAK USAHA ---
   public static getWargaNgontrakUsaha(): WargaNgontrakUsaha[] {
-    let list = getStorage<WargaNgontrakUsaha[]>(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, INITIAL_WARGA_NGONTRAK_USAHA);
-    if (!list || list.length === 0) {
-      list = INITIAL_WARGA_NGONTRAK_USAHA;
-      setStorage(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, list);
-    }
-    return list;
+    return getStorage<WargaNgontrakUsaha[]>(STORAGE_KEYS.WARGA_NGONTRAK_USAHA, []);
   }
 
   public static addWargaNgontrakUsaha(item: Omit<WargaNgontrakUsaha, 'id' | 'createdAt' | 'updatedAt'>): WargaNgontrakUsaha {

@@ -59,13 +59,16 @@ async function readCloudSnapshot(): Promise<any> {
     const snap = await getDoc(doc(fbDb, 'system', 'database_snapshot'));
     if (snap.exists()) {
       const snapData = snap.data();
-      let data = snapData.data;
-      if (!data && snapData.dataJson) {
+      let data: any = null;
+      if (snapData.dataJson) {
         try {
           data = JSON.parse(snapData.dataJson);
         } catch (e) {
           console.error('[Vercel API] Error parsing dataJson:', e);
         }
+      }
+      if (!data && snapData.data) {
+        data = snapData.data;
       }
       if (data && typeof data === 'object') {
         data.version = snapData.version || data.version || 20;
@@ -98,9 +101,20 @@ async function writeCloudSnapshot(data: any): Promise<boolean> {
       lastPublishedAt: data.isPublishedSnapshot ? nowIso : undefined,
       isPublishedSnapshot: data.isPublishedSnapshot ?? true,
       dataJson: JSON.stringify(data),
+      counts: {
+        users: Array.isArray(data.users) ? data.users.length : 0,
+        residents: Array.isArray(data.residents) ? data.residents.length : 0,
+        families: Array.isArray(data.families) ? data.families.length : 0,
+        letters: Array.isArray(data.letters) ? data.letters.length : 0,
+        dues: Array.isArray(data.dues) ? data.dues.length : 0,
+        transactions: Array.isArray(data.transactions) ? data.transactions.length : 0,
+        complaints: Array.isArray(data.complaints) ? data.complaints.length : 0,
+        announcements: Array.isArray(data.announcements) ? data.announcements.length : 0,
+        events: Array.isArray(data.events) ? data.events.length : 0,
+      },
       updatedByRole: 'vercel_api',
       cloudPlatform: 'vercel'
-    }, { merge: true });
+    });
     return true;
   } catch (err) {
     console.warn('[Vercel API] Cloud snapshot write failed:', err);
