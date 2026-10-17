@@ -10,6 +10,8 @@ import {
   UserCheck, 
   FileText,
   Trash2,
+  Edit,
+  ShieldAlert,
   AlertTriangle,
   CheckCircle2
 } from 'lucide-react';
@@ -23,12 +25,21 @@ interface DaftarKkProps {
 export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
   const [families, setFamilies] = useState<FamilyCard[]>(() => StorageService.getFamilies());
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRt, setSelectedRt] = useState<string>(
-    currentUser.role === 'pengurus_rt' ? currentUser.RT : 'all'
-  );
+  const [selectedRt, setSelectedRt] = useState<string>('all');
   const [selectedFamily, setSelectedFamily] = useState<FamilyCard | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   
+  // Edit modal state (Khusus Super Admin)
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [familyToEdit, setFamilyToEdit] = useState<FamilyCard | null>(null);
+  const [editNomorKk, setEditNomorKk] = useState('');
+  const [editKepala, setEditKepala] = useState('');
+  const [editAlamat, setEditAlamat] = useState('');
+  const [editRt, setEditRt] = useState('01');
+  const [editNomorRumah, setEditNomorRumah] = useState('');
+  const [editStatusRumah, setEditStatusRumah] = useState<FamilyCard['statusRumah']>('Milik Sendiri');
+  const [editErrorMsg, setEditErrorMsg] = useState('');
+
   // Delete modal state (Khusus Super Admin)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [familyToDelete, setFamilyToDelete] = useState<FamilyCard | null>(null);
@@ -39,7 +50,7 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
   const [formNomorKk, setFormNomorKk] = useState('');
   const [formKepala, setFormKepala] = useState('');
   const [formAlamat, setFormAlamat] = useState('');
-  const [formRt, setFormRt] = useState(currentUser.RT || '02');
+  const [formRt, setFormRt] = useState('01');
   const [formNomorRumah, setFormNomorRumah] = useState('');
   const [formStatusRumah, setFormStatusRumah] = useState<FamilyCard['statusRumah']>('Milik Sendiri');
   const [errorMsg, setErrorMsg] = useState('');
@@ -52,15 +63,30 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
     return unsubscribe;
   }, []);
 
-  const isPrivileged = currentUser.role !== 'warga';
-  const { family: myFamily } = StorageService.getFamilyForUser(currentUser);
+  // HANYA ROLE SUPER ADMIN YANG MEMILIKI HAK AKSES MELIHAT & EDIT DATA KARTU KELUARGA (KK)
+  if (currentUser.role !== 'super_admin') {
+    return (
+      <div className="max-w-2xl mx-auto p-6 sm:p-8 my-10 bg-white rounded-2xl border border-amber-200 shadow-sm text-center">
+        <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200/60 shadow-xs">
+          <ShieldAlert className="w-7 h-7" />
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold mb-2">
+          <span>Hak Akses Terbatas</span>
+        </div>
+        <h2 className="text-lg font-bold text-slate-900 mb-2">
+          Data Kartu Keluarga (KK) RW 03 Kebon Kangkung
+        </h2>
+        <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto mb-5">
+          Sesuai kebijakan hak akses sistem RW 03 Kebon Kangkung, akses untuk melihat, memeriksa, dan mengedit data Kartu Keluarga (KK) seluruh lingkungan <strong>hanya diberikan kepada role Super Admin</strong> (Pengelola IT RW 03).
+        </p>
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium">
+          <span>Role akun Anda saat ini: <strong className="capitalize text-slate-900">{currentUser.role.replace('_', ' ')}</strong></span>
+        </div>
+      </div>
+    );
+  }
 
   const filteredFamilies = families.filter(f => {
-    // If citizen (warga), strictly only can access their own family card!
-    if (currentUser.role === 'warga') {
-      return f.nomorKK === myFamily.nomorKK;
-    }
-    if (currentUser.role === 'pengurus_rt' && f.rt !== currentUser.RT) return false;
     if (selectedRt !== 'all' && f.rt !== selectedRt) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -74,7 +100,8 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
 
   const handleCreateFamily = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formNomorKk || formNomorKk.length < 16) {
+    const cleanKk = formNomorKk.replace(/\D/g, '');
+    if (!cleanKk || cleanKk.length < 16) {
       setErrorMsg('Nomor KK harus 16 digit angka.');
       return;
     }
@@ -84,30 +111,95 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
     }
 
     StorageService.addFamily({
-      nomorKK: formNomorKk,
+      nomorKK: cleanKk,
       namaKepalaKeluarga: formKepala.trim(),
-      alamat: formAlamat.trim() || `Jl. Kebon Kangkung II No. ${formNomorRumah || '01'}`,
+      alamat: formAlamat.trim() || `Jl. Kebon Kangkung RT ${formRt} / RW 03`,
       rt: formRt,
       rw: '03',
-      nomorRumah: formNomorRumah || '01',
+      nomorRumah: formNomorRumah.trim() || '01',
       statusRumah: formStatusRumah
     });
 
     setIsAddOpen(false);
     setFormNomorKk('');
     setFormKepala('');
+    setFormAlamat('');
+    setFormNomorRumah('');
     setErrorMsg('');
+    setToastMessage(`Data Kartu Keluarga an. ${formKepala.trim()} (No. KK: ${cleanKk}) berhasil ditambahkan!`);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3500);
+  };
+
+  const handleOpenEdit = (fam: FamilyCard, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setFamilyToEdit(fam);
+    setEditNomorKk(fam.nomorKK);
+    setEditKepala(fam.namaKepalaKeluarga);
+    setEditAlamat(fam.alamat);
+    setEditRt(fam.rt || '01');
+    setEditNomorRumah(fam.nomorRumah || '01');
+    setEditStatusRumah(fam.statusRumah || 'Milik Sendiri');
+    setEditErrorMsg('');
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!familyToEdit) return;
+
+    const cleanKk = editNomorKk.replace(/\D/g, '');
+    if (!cleanKk || cleanKk.length < 16) {
+      setEditErrorMsg('Nomor KK harus 16 digit angka.');
+      return;
+    }
+    if (!editKepala.trim()) {
+      setEditErrorMsg('Nama kepala keluarga wajib diisi.');
+      return;
+    }
+
+    const success = StorageService.updateFamily(familyToEdit.nomorKK, {
+      nomorKK: cleanKk,
+      namaKepalaKeluarga: editKepala.trim(),
+      alamat: editAlamat.trim() || `Jl. Kebon Kangkung RT ${editRt} / RW 03`,
+      rt: editRt,
+      rw: '03',
+      nomorRumah: editNomorRumah.trim() || '01',
+      statusRumah: editStatusRumah
+    });
+
+    if (success) {
+      setFamilies(StorageService.getFamilies());
+      if (selectedFamily?.nomorKK === familyToEdit.nomorKK) {
+        setSelectedFamily({
+          ...selectedFamily,
+          nomorKK: cleanKk,
+          namaKepalaKeluarga: editKepala.trim(),
+          alamat: editAlamat.trim() || `Jl. Kebon Kangkung RT ${editRt} / RW 03`,
+          rt: editRt,
+          rw: '03',
+          nomorRumah: editNomorRumah.trim() || '01',
+          statusRumah: editStatusRumah
+        });
+      }
+      setIsEditOpen(false);
+      setFamilyToEdit(null);
+      setToastMessage(`Data Kartu Keluarga an. ${editKepala.trim()} (No. KK: ${cleanKk}) berhasil diperbarui!`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3500);
+    } else {
+      setEditErrorMsg('Gagal memperbarui data Kartu Keluarga.');
+    }
   };
 
   const handleOpenDelete = (fam: FamilyCard, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (currentUser.role !== 'super_admin') return;
     setFamilyToDelete(fam);
     setIsDeleteModalOpen(true);
   };
 
   const handleConfirmDelete = () => {
-    if (!familyToDelete || currentUser.role !== 'super_admin') return;
+    if (!familyToDelete) return;
     const kkNum = familyToDelete.nomorKK;
     const name = familyToDelete.namaKepalaKeluarga;
     const success = StorageService.deleteFamily(kkNum);
@@ -143,68 +235,51 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Home className="w-5 h-5 text-emerald-700" />
-            {currentUser.role === 'warga' 
-              ? `Data Kartu Keluarga Anda (Keluarga ${myFamily.namaKepalaKeluarga})` 
-              : 'Data Kartu Keluarga (KK) RW 03 Kebon Kangkung'}
+            <span>Data Kartu Keluarga (KK) RW 03 Kebon Kangkung</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+              Hak Akses Super Admin
+            </span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            {currentUser.role === 'warga' 
-              ? 'Hanya Anda dan keluarga bersangkutan yang memiliki hak akses terhadap data ini' 
-              : 'Daftar kepala keluarga dan hubungan anggota keluarga terdaftar'}
+            Daftar kepala keluarga dan hubungan anggota keluarga terdaftar se-RW 03 (Kelola, Edit, dan Hapus)
           </p>
         </div>
 
-        {isPrivileged && (
-          <button
-            onClick={() => setIsAddOpen(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tambah Kartu Keluarga</span>
-          </button>
-        )}
+        <button
+          onClick={() => setIsAddOpen(true)}
+          className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Tambah Kartu Keluarga</span>
+        </button>
       </div>
 
-      {/* Search & RT Filter for Pengurus, or Privacy Notice for Warga */}
-      {currentUser.role === 'warga' ? (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-900">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
-              Akses Terbatas
-            </span>
-            <span>Data keluarga terproteksi. Warga hanya dapat mengakses data keluarga yang bersangkutan.</span>
-          </div>
-          <span className="text-[11px] font-semibold text-emerald-700 hidden sm:inline">RT {myFamily.rt} / RW {myFamily.rw}</span>
+      {/* Search & RT Filter */}
+      <div className="flex flex-col sm:flex-row gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Cari No. KK, nama kepala keluarga, atau alamat..."
+            className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-600 text-xs"
+          />
         </div>
-      ) : (
-        <div className="flex flex-col sm:flex-row gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Cari No. KK, nama kepala keluarga, atau alamat..."
-              className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-600 text-xs"
-            />
-          </div>
 
-          {currentUser.role !== 'pengurus_rt' && (
-            <select
-              value={selectedRt}
-              onChange={e => setSelectedRt(e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-            >
-              <option value="all">Semua RT (01 - 05)</option>
-              <option value="01">RT 01</option>
-              <option value="02">RT 02</option>
-              <option value="03">RT 03</option>
-              <option value="04">RT 04</option>
-              <option value="05">RT 05</option>
-            </select>
-          )}
-        </div>
-      )}
+        <select
+          value={selectedRt}
+          onChange={e => setSelectedRt(e.target.value)}
+          className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+        >
+          <option value="all">Semua RT (01 - 05)</option>
+          <option value="01">RT 01</option>
+          <option value="02">RT 02</option>
+          <option value="03">RT 03</option>
+          <option value="04">RT 04</option>
+          <option value="05">RT 05</option>
+        </select>
+      </div>
 
       {/* Grid of Family Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -230,14 +305,24 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
                   </div>
 
                   {currentUser.role === 'super_admin' && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleOpenDelete(fam, e)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                      title="Hapus Kartu Keluarga (Khusus Super Admin)"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={(e) => handleOpenEdit(fam, e)}
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                        title="Edit Kartu Keluarga (Khusus Super Admin)"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleOpenDelete(fam, e)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Hapus Kartu Keluarga (Khusus Super Admin)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -351,16 +436,28 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
             </div>
 
             <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-              <div>
+              <div className="flex items-center gap-2">
                 {currentUser.role === 'super_admin' && (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenDelete(selectedFamily)}
-                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Hapus KK</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(selectedFamily)}
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Edit Data Kartu Keluarga (Khusus Super Admin)"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      <span>Edit KK</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDelete(selectedFamily)}
+                      className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Hapus Data Kartu Keluarga (Khusus Super Admin)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus KK</span>
+                    </button>
+                  </>
                 )}
               </div>
 
@@ -483,6 +580,134 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
                   className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold"
                 >
                   Simpan KK
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit KK Modal (Khusus Super Admin) */}
+      {isEditOpen && familyToEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-slate-900 to-blue-950 text-white">
+              <div className="flex items-center gap-2">
+                <Edit className="w-4 h-4 text-blue-300" />
+                <h3 className="font-bold text-sm">Edit Data Kartu Keluarga (KK)</h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsEditOpen(false);
+                  setFamilyToEdit(null);
+                }} 
+                className="p-1 rounded-lg text-white/70 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-3 text-xs">
+              {editErrorMsg && (
+                <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800">
+                  {editErrorMsg}
+                </div>
+              )}
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Nomor Kartu Keluarga (16 Digit) *</label>
+                <input
+                  type="text"
+                  maxLength={16}
+                  value={editNomorKk}
+                  onChange={e => setEditNomorKk(e.target.value.replace(/\D/g, ''))}
+                  placeholder="327318..."
+                  required
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Nama Kepala Keluarga *</label>
+                <input
+                  type="text"
+                  value={editKepala}
+                  onChange={e => setEditKepala(e.target.value)}
+                  placeholder="Nama Lengkap Kepala Keluarga"
+                  required
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Wilayah RT</label>
+                  <select
+                    value={editRt}
+                    onChange={e => setEditRt(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  >
+                    <option value="01">RT 01</option>
+                    <option value="02">RT 02</option>
+                    <option value="03">RT 03</option>
+                    <option value="04">RT 04</option>
+                    <option value="05">RT 05</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Nomor Rumah</label>
+                  <input
+                    type="text"
+                    value={editNomorRumah}
+                    onChange={e => setEditNomorRumah(e.target.value)}
+                    placeholder="Contoh: 18B"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Status Kepemilikan Rumah</label>
+                <select
+                  value={editStatusRumah}
+                  onChange={e => setEditStatusRumah(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                >
+                  <option value="Milik Sendiri">Milik Sendiri</option>
+                  <option value="Sewa / Kontrak">Sewa / Kontrak</option>
+                  <option value="Rumah Dinas">Rumah Dinas</option>
+                  <option value="Menumpang">Menumpang</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Alamat Domisili</label>
+                <input
+                  type="text"
+                  value={editAlamat}
+                  onChange={e => setEditAlamat(e.target.value)}
+                  placeholder="Jl. Kebon Kangkung..."
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditOpen(false);
+                    setFamilyToEdit(null);
+                  }}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs hover:bg-slate-50 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Simpan Perubahan KK</span>
                 </button>
               </div>
             </form>

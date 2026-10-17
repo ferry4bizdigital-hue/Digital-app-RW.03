@@ -6,7 +6,7 @@ import { StorageService } from '../../services/storageService';
 interface FormWargaModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Omit<Resident, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onSave: (data: Omit<Resident, 'id' | 'createdAt' | 'updatedAt'>, editId?: string) => void;
   initialData?: Resident;
   defaultRt?: string;
   currentUser?: User;
@@ -108,6 +108,8 @@ export const FormWargaModal: React.FC<FormWargaModalProps> = ({
   };
 
   // Sinkronkan semua kolom isian dengan data warga sebelum di edit (initialData)
+  // Hanya berjalan saat modal dibuka atau ID data warga yang diedit berganti,
+  // sehingga ketikan/perubahan pengguna tidak akan ter-reset saat parent re-render.
   useEffect(() => {
     if (isOpen) {
       const activeRt = (currentUser?.role === 'pengurus_rt' && currentUser?.RT) 
@@ -181,17 +183,21 @@ export const FormWargaModal: React.FC<FormWargaModalProps> = ({
       }
       setErrorMsg('');
     }
-  }, [isOpen, initialData, defaultRt, currentUser]);
+  }, [isOpen, initialData?.id, initialData?.updatedAt]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nik || nik.length < 16) {
+
+    let cleanNik = (nik || '').replace(/\D/g, '');
+    let cleanKk = (nomorKK || '').replace(/\D/g, '');
+
+    if (!cleanNik || cleanNik.length < 16) {
       setErrorMsg('NIK harus terdiri dari 16 digit angka.');
       return;
     }
-    if (!nomorKK || nomorKK.length < 16) {
+    if (!cleanKk || cleanKk.length < 16) {
       setErrorMsg('Nomor Kartu Keluarga harus terdiri dari 16 digit angka.');
       return;
     }
@@ -213,28 +219,6 @@ export const FormWargaModal: React.FC<FormWargaModalProps> = ({
         : (rt || activeRt || '02')
     );
 
-    let cleanNik = nik.replace(/\D/g, '');
-    if (!cleanNik) {
-      setErrorMsg('Nomor Induk Kependudukan (NIK) wajib diisi.');
-      return;
-    }
-    // Jika digit NIK kurang dari 16 digit, lengkapi otomatis agar tidak gagal simpan
-    if (cleanNik.length < 16) {
-      cleanNik = cleanNik.padEnd(16, '0');
-    }
-
-    let cleanKk = nomorKK.replace(/\D/g, '');
-    if (!cleanKk) {
-      cleanKk = `327318${finalRt}${Date.now().toString().slice(-8)}`;
-    } else if (cleanKk.length < 16) {
-      cleanKk = cleanKk.padEnd(16, '0');
-    }
-
-    if (!namaLengkap.trim()) {
-      setErrorMsg('Nama lengkap warga wajib diisi.');
-      return;
-    }
-
     onSave({
       NIK: cleanNik,
       nomorKK: cleanKk,
@@ -255,7 +239,7 @@ export const FormWargaModal: React.FC<FormWargaModalProps> = ({
       rw,
       statusDomisili,
       statusWarga
-    });
+    }, initialData?.id);
 
     onClose();
   };

@@ -138,11 +138,24 @@ export const RtDashboard: React.FC<RtDashboardProps> = ({ currentUser, onNavigat
 
         {/* Card 2: Kartu Keluarga (Sesuai dengan data warga) */}
         <div 
-          onClick={() => onNavigateTab('kk')}
-          className="p-4 bg-white rounded-2xl border border-slate-200 hover:border-blue-300 transition-all cursor-pointer shadow-2xs group"
+          onClick={() => {
+            if (currentUser.role === 'super_admin') {
+              onNavigateTab('kk');
+            }
+          }}
+          className={`p-4 bg-white rounded-2xl border border-slate-200 transition-all shadow-2xs group ${
+            currentUser.role === 'super_admin' ? 'hover:border-blue-300 cursor-pointer' : 'cursor-default'
+          }`}
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold text-slate-700">Kartu Keluarga RT {rtCode}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-slate-700">Kartu Keluarga RT {rtCode}</span>
+              {currentUser.role !== 'super_admin' && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-normal">
+                  Khusus Super Admin
+                </span>
+              )}
+            </div>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
               <Home className="w-4 h-4" />
             </div>
@@ -150,8 +163,13 @@ export const RtDashboard: React.FC<RtDashboardProps> = ({ currentUser, onNavigat
           <div className="text-2xl font-bold text-slate-900 tabular-nums font-mono">
             {totalKkCount}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
-            Kepala keluarga (sinkron data warga)
+          <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+            <span>Kepala keluarga terdaftar</span>
+            {currentUser.role === 'super_admin' && (
+              <span className="text-[10px] text-blue-700 font-semibold group-hover:underline">
+                Kelola KK →
+              </span>
+            )}
           </div>
         </div>
 

@@ -135,25 +135,27 @@ export const DaftarWarga: React.FC<DaftarWargaProps> = ({ currentUser }) => {
     return list.sort((a, b) => a.namaLengkap.localeCompare(b.namaLengkap, 'id', { sensitivity: 'base' }));
   }, [residents, searchQuery, selectedRt, selectedGender, selectedStatus, selectedAgeGroup, currentUser]);
 
-  const handleSaveResident = (data: Omit<Resident, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleSaveResident = (data: Omit<Resident, 'id' | 'createdAt' | 'updatedAt'>, editId?: string) => {
     if (currentUser.role === 'warga') return;
 
     let targetId: string | null = null;
+    const targetEditId = editId || editingResident?.id;
     const effectiveRt = currentUser.role === 'pengurus_rt' 
       ? StorageService.normalizeRt(currentUser.RT) 
       : StorageService.normalizeRt(data.rt || '02');
     
     data.rt = effectiveRt;
 
-    if (editingResident) {
-      if (currentUser.role === 'pengurus_rt' && StorageService.normalizeRt(editingResident.rt) !== effectiveRt) return;
-      StorageService.updateResident(editingResident.id, data);
-      targetId = editingResident.id;
+    if (targetEditId) {
+      StorageService.updateResident(targetEditId, data);
+      targetId = targetEditId;
       setToastMessage(`Data warga an. ${data.namaLengkap} berhasil diperbarui!`);
+      StorageService.pushToServer(true).catch(() => {});
     } else {
       const created = StorageService.addResident(data);
       targetId = created.id;
       setToastMessage(`Data warga baru an. ${data.namaLengkap} berhasil disimpan dan langsung tercatat pada Daftar Warga Terdata (A - Z)!`);
+      StorageService.pushToServer(true).catch(() => {});
     }
 
     // Ambil data mutakhir langsung dari storage

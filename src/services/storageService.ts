@@ -384,7 +384,7 @@ export class StorageService {
       if (this.isOffline()) return;
       if (payload && payload.data) {
         const localVer = getStorage<number>(STORAGE_KEYS.SYNC_VERSION, 1);
-        if (payload.version >= localVer || payload.isPublishedSnapshot) {
+        if (payload.version > localVer) {
           console.log('[StorageService] Real-time online update received from Firestore (v' + payload.version + ')');
           this.applyServerData(payload.data);
           this.lastSyncTime = payload.lastSyncedAt;
@@ -963,39 +963,110 @@ export class StorageService {
 
   public static updateResident(id: string, updates: Partial<Resident>): boolean {
     const residents = this.getResidents();
-    const index = residents.findIndex(r => r.id === id);
-    if (index === -1) return false;
+    // 1. Cari berdasarkan id, jika tidak cocok coba cari berdasarkan NIK
+    let index = residents.findIndex(r => r.id === id);
+    if (index === -1 && updates.NIK) {
+      index = residents.findIndex(r => r.NIK === updates.NIK);
+    }
+    if (index === -1) {
+      console.warn(`[StorageService] updateResident: resident ${id} not found, adding resident instead`);
+      return !!this.addResident({
+        ...updates,
+        id
+      } as any);
+    }
 
-    residents[index] = {
-      ...residents[index],
+    const prevResident = residents[index];
+
+    // Bersihkan NIK & ID dari daftar warga terhapus jika ada
+    const targetNik = updates.NIK || prevResident.NIK;
+    if (targetNik) {
+      const deletedIds = this.getDeletedResidentIds();
+      if (deletedIds.includes(targetNik) || deletedIds.includes(id) || deletedIds.includes(prevResident.id)) {
+        setStorage(STORAGE_KEYS.DELETED_RESIDENTS, deletedIds.filter(d => d !== targetNik && d !== id && d !== prevResident.id), false);
+      }
+    }
+
+    // Jika nomorKK diperbarui, bersihkan nomorKK baru dari deletedFamilies
+    if (updates.nomorKK) {
+      const deletedKks = this.getDeletedFamilyKks();
+      if (deletedKks.includes(updates.nomorKK)) {
+        setStorage(STORAGE_KEYS.DELETED_FAMILIES, deletedKks.filter(k => k !== updates.nomorKK), false);
+      }
+    }
+
+    const updatedResident: Resident = {
+      ...prevResident,
       ...updates,
+      id: prevResident.id || id,
       updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
     };
 
+    residents[index] = updatedResident;
+
+    // Susun terurut alfabetis (A - Z) berdasarkan nama lengkap
+    residents.sort((a, b) => a.namaLengkap.localeCompare(b.namaLengkap, 'id', { sensitivity: 'base' }));
     setStorage(STORAGE_KEYS.RESIDENTS, residents);
 
-    // Update jumlah anggota KK aktif (tidak termasuk warga meninggal atau pindah)
-    if (residents[index].nomorKK) {
+    // Update jumlah anggota KK aktif dan Kepala Keluarga jika diperlukan
+    const effectiveKk = updatedResident.nomorKK || prevResident.nomorKK;
+    if (effectiveKk) {
       const families = this.getFamilies();
-      const famIndex = families.findIndex(f => f.nomorKK === residents[index].nomorKK);
+      const famIndex = families.findIndex(f => f.nomorKK === effectiveKk);
       if (famIndex !== -1) {
         const remainingLiving = residents.filter(
-          r => r.nomorKK === residents[index].nomorKK && r.statusWarga !== 'Meninggal' && r.statusWarga !== 'Pindah'
+          r => r.nomorKK === effectiveKk && r.statusWarga !== 'Meninggal' && r.statusWarga !== 'Pindah'
         );
         families[famIndex].jumlahAnggota = remainingLiving.length;
+        if (updatedResident.hubunganKeluarga === 'Kepala Keluarga') {
+          families[famIndex].namaKepalaKeluarga = updatedResident.namaLengkap;
+        }
         setStorage(STORAGE_KEYS.FAMILIES, families);
       }
     }
 
-    // Jika status dirubah menjadi Meninggal atau Pindah, nonaktifkan akun user login terkait
-    const isNowInactive = residents[index].statusWarga === 'Meninggal' || residents[index].statusWarga === 'Pindah';
-    if (residents[index].NIK && isNowInactive) {
+    // Jika nomor KK berpindah, perbarui juga KK lama
+    if (prevResident.nomorKK && prevResident.nomorKK !== updatedResident.nomorKK) {
+      const families = this.getFamilies();
+      const oldFamIndex = families.findIndex(f => f.nomorKK === prevResident.nomorKK);
+      if (oldFamIndex !== -1) {
+        const remainingInOld = residents.filter(
+          r => r.nomorKK === prevResident.nomorKK && r.statusWarga !== 'Meninggal' && r.statusWarga !== 'Pindah'
+        );
+        families[oldFamIndex].jumlahAnggota = remainingInOld.length;
+        setStorage(STORAGE_KEYS.FAMILIES, families);
+      }
+    }
+
+    // Harmonisasikan data Kartu Keluarga secara menyeluruh
+    this.getFamilies();
+
+    // Sinkronkan akun pengguna jika warga ini memiliki akun user login
+    try {
       const users = this.getUsers();
-      const userIdx = users.findIndex(u => u.NIK === residents[index].NIK);
-      if (userIdx !== -1 && users[userIdx].role === 'warga') {
-        users[userIdx].statusAkun = 'nonaktif';
+      const searchNik = targetNik;
+      const userIdx = users.findIndex(u => 
+        (searchNik && u.NIK === searchNik) || 
+        u.userId === `usr-warga-${updatedResident.id}` ||
+        u.userId === `usr-warga-${id}`
+      );
+      if (userIdx !== -1) {
+        users[userIdx] = {
+          ...users[userIdx],
+          nama: updatedResident.namaLengkap,
+          email: updatedResident.email || users[userIdx].email,
+          nomorHP: updatedResident.nomorHP || users[userIdx].nomorHP,
+          alamat: updatedResident.alamat || users[userIdx].alamat,
+          NIK: updatedResident.NIK || users[userIdx].NIK,
+          RT: updatedResident.rt,
+          RW: updatedResident.rw,
+          statusAkun: (updatedResident.statusWarga === 'Meninggal' || updatedResident.statusWarga === 'Pindah') ? 'nonaktif' : 'aktif',
+          updatedAt: new Date().toISOString()
+        };
         setStorage(STORAGE_KEYS.USERS, users);
       }
+    } catch (e) {
+      console.warn('Failed to sync user on update resident', e);
     }
 
     const cur = this.getCurrentUser();
@@ -1005,9 +1076,12 @@ export class StorageService {
       cur.role,
       'EDIT_WARGA',
       'Warga',
-      id,
-      `Memperbarui data warga: ${residents[index].namaLengkap} (Status: ${residents[index].statusWarga})`
+      updatedResident.id,
+      `Memperbarui data warga: ${updatedResident.namaLengkap} (NIK: ${updatedResident.NIK}, RT: ${updatedResident.rt}, Status: ${updatedResident.statusWarga})`
     );
+
+    // Segera dorong perubahan secara permanen ke Cloud Firestore dan Vercel server
+    this.pushToServer(true).catch(err => console.warn('[StorageService] Push on updateResident error:', err));
 
     this.notify();
     return true;
@@ -1358,6 +1432,76 @@ export class StorageService {
       `Super Admin menghapus data Kartu Keluarga No. ${nomorKK} an. ${target.namaKepalaKeluarga} (RT ${target.rt}/RW ${target.rw})`
     );
 
+    this.notify();
+    return true;
+  }
+
+  public static updateFamily(oldNomorKk: string, updates: Partial<FamilyCard>): boolean {
+    const families = this.getFamilies();
+    const index = families.findIndex(f => f.nomorKK === oldNomorKk);
+    if (index === -1) return false;
+
+    const currentFam = families[index];
+    const newNomorKk = updates.nomorKK ? updates.nomorKK.trim() : currentFam.nomorKK;
+
+    // Bersihkan newNomorKk dari deletedFamilies jika ada
+    if (newNomorKk) {
+      const deletedKks = this.getDeletedFamilyKks();
+      if (deletedKks.includes(newNomorKk)) {
+        setStorage(STORAGE_KEYS.DELETED_FAMILIES, deletedKks.filter(k => k !== newNomorKk), false);
+      }
+    }
+
+    const updatedFamily: FamilyCard = {
+      ...currentFam,
+      ...updates,
+      nomorKK: newNomorKk
+    };
+
+    families[index] = updatedFamily;
+    setStorage(STORAGE_KEYS.FAMILIES, families);
+
+    // Jika nomorKK atau alamat atau RT berubah, perbarui data warga yang terikat pada KK tersebut
+    const residents = this.getResidents();
+    let hasResidentChanges = false;
+    const updatedResidents = residents.map(r => {
+      if (r.nomorKK === oldNomorKk) {
+        hasResidentChanges = true;
+        return {
+          ...r,
+          nomorKK: newNomorKk,
+          alamat: updates.alamat || r.alamat,
+          rt: updates.rt || r.rt,
+          rw: updates.rw || r.rw
+        };
+      }
+      return r;
+    });
+    if (hasResidentChanges) {
+      setStorage(STORAGE_KEYS.RESIDENTS, updatedResidents);
+    }
+
+    // Jika nama kepala keluarga diubah, sinkronkan ke warga yang menjadi kepala keluarga
+    if (updates.namaKepalaKeluarga && updates.namaKepalaKeluarga !== currentFam.namaKepalaKeluarga) {
+      const targetKepala = residents.find(r => (r.nomorKK === newNomorKk || r.nomorKK === oldNomorKk) && r.hubunganKeluarga === 'Kepala Keluarga');
+      if (targetKepala) {
+        this.updateResident(targetKepala.id, { namaLengkap: updates.namaKepalaKeluarga });
+      }
+    }
+
+    const cur = this.getCurrentUser();
+    this.logAction(
+      cur.userId,
+      cur.nama,
+      cur.role,
+      'EDIT_WARGA',
+      'Warga',
+      newNomorKk,
+      `Super Admin memperbarui data Kartu Keluarga No. ${newNomorKk} an. ${updatedFamily.namaKepalaKeluarga} (RT ${updatedFamily.rt}/RW ${updatedFamily.rw})`
+    );
+
+    // Langsung dorong ke Cloud Firestore dan Vercel
+    this.pushToServer(true).catch(err => console.warn('[StorageService] Push on updateFamily error:', err));
     this.notify();
     return true;
   }

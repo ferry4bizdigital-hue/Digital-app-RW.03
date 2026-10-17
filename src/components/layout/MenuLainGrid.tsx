@@ -75,10 +75,10 @@ export const MenuLainGrid: React.FC<MenuLainGridProps> = ({
     {
       id: 'kk' as ActiveTab,
       title: 'Kartu Keluarga',
-      desc: 'Daftar KK & hubungan famili',
+      desc: 'Daftar KK se-RW (Khusus Super Admin)',
       icon: Home,
       color: 'bg-blue-50 text-blue-700',
-      allowed: true
+      allowed: role === 'super_admin'
     },
     {
       id: 'surat' as ActiveTab,

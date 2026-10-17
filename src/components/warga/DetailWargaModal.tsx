@@ -44,7 +44,7 @@ export const DetailWargaModal: React.FC<DetailWargaModalProps> = ({
     currentUser.role === 'super_admin' || 
     currentUser.role === 'ketua_rw' || 
     currentUser.role === 'bendahara' || 
-    (currentUser.role === 'pengurus_rt' && currentUser.RT === resident.rt) ||
+    (currentUser.role === 'pengurus_rt' && StorageService.normalizeRt(currentUser.RT) === StorageService.normalizeRt(resident.rt)) ||
     currentUser.NIK === resident.NIK;
 
   const displayNik = (showFullNik && canViewFullNik)
@@ -59,7 +59,7 @@ export const DetailWargaModal: React.FC<DetailWargaModalProps> = ({
     currentUser.role === 'super_admin' || 
     currentUser.role === 'ketua_rw' ||
     currentUser.role === 'bendahara' ||
-    (currentUser.role === 'pengurus_rt' && currentUser.RT === resident.rt);
+    (currentUser.role === 'pengurus_rt' && StorageService.normalizeRt(currentUser.RT) === StorageService.normalizeRt(resident.rt));
 
   const canDelete = currentUser.role === 'super_admin';
 
