@@ -24,7 +24,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { StorageService } from '../../services/storageService';
-import { WargaNgontrakUsaha, User } from '../../types';
+import { WargaNgontrakUsaha, User, getBillingPeriodsForYear, getCurrentDefaultBillingPeriod } from '../../types';
 import { ActiveTab } from '../layout/BottomNav';
 
 interface ModulNgontrakUsahaProps {
@@ -72,7 +72,7 @@ export const ModulNgontrakUsaha: React.FC<ModulNgontrakUsahaProps> = ({
 
   // Modal Input IWD untuk Usaha
   const [iwdModalItem, setIwdModalItem] = useState<WargaNgontrakUsaha | null>(null);
-  const [iwdPeriode, setIwdPeriode] = useState('September 2026');
+  const [iwdPeriode, setIwdPeriode] = useState<string>(() => getCurrentDefaultBillingPeriod());
   const [iwdJenis, setIwdJenis] = useState<'IWD (Iuran Warga Digital)' | 'Sosial & Kematian' | 'Kebersihan'>('IWD (Iuran Warga Digital)');
   const [iwdNominal, setIwdNominal] = useState<number | ''>('');
   const [iwdStatus, setIwdStatus] = useState<'Belum Bayar' | 'Lunas'>('Belum Bayar');
@@ -207,7 +207,7 @@ export const ModulNgontrakUsaha: React.FC<ModulNgontrakUsahaProps> = ({
   // Handler Buka Modal Input IWD untuk Usaha Ini
   const handleOpenInputIwd = (item: WargaNgontrakUsaha) => {
     setIwdModalItem(item);
-    setIwdPeriode('September 2026');
+    setIwdPeriode(getCurrentDefaultBillingPeriod());
     setIwdJenis('IWD (Iuran Warga Digital)');
     setIwdNominal('');
     setIwdStatus('Belum Bayar');
@@ -1134,16 +1134,25 @@ export const ModulNgontrakUsaha: React.FC<ModulNgontrakUsahaProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Periode Tagihan:</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 block">Periode Tagihan:</label>
+                    <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      Tahun {new Date().getFullYear()}
+                    </span>
+                  </div>
                   <select
                     value={iwdPeriode}
                     onChange={e => setIwdPeriode(e.target.value)}
-                    className="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    className="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer font-medium"
                   >
-                    <option value="September 2026">September 2026</option>
-                    <option value="Oktober 2026">Oktober 2026</option>
-                    <option value="November 2026">November 2026</option>
-                    <option value="Desember 2026">Desember 2026</option>
+                    {iwdPeriode && !getBillingPeriodsForYear().includes(iwdPeriode) && (
+                      <option value={iwdPeriode}>{iwdPeriode}</option>
+                    )}
+                    {getBillingPeriodsForYear().map(periode => (
+                      <option key={periode} value={periode}>
+                        {periode} {periode === getCurrentDefaultBillingPeriod() ? '• (Bulan Berjalan)' : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

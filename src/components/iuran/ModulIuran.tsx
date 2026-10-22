@@ -25,7 +25,7 @@ import {
   Users,
   HeartHandshake
 } from 'lucide-react';
-import { DueBill, User, JenisIuran, WargaNgontrakUsaha } from '../../types';
+import { DueBill, User, JenisIuran, WargaNgontrakUsaha, getBillingPeriodsForYear, getCurrentDefaultBillingPeriod } from '../../types';
 import { StorageService } from '../../services/storageService';
 import { ActiveTab } from '../layout/BottomNav';
 
@@ -45,6 +45,7 @@ type SortOption =
   | 'tanggal-asc';
 
 export const ModulIuran: React.FC<ModulIuranProps> = ({ currentUser, onNavigateTab }) => {
+  const currentYearBillingPeriods = getBillingPeriodsForYear();
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -70,7 +71,7 @@ export const ModulIuran: React.FC<ModulIuranProps> = ({ currentUser, onNavigateT
   const [formNomorKk, setFormNomorKk] = useState('');
   const [formRt, setFormRt] = useState(currentUser.RT || '02');
   const [formJenisIuran, setFormJenisIuran] = useState<JenisIuran>('IWD (Iuran Warga Digital)');
-  const [formPeriode, setFormPeriode] = useState('September 2026');
+  const [formPeriode, setFormPeriode] = useState<string>(() => getCurrentDefaultBillingPeriod());
   const [formNominal, setFormNominal] = useState<number | ''>('');
   const [formStatus, setFormStatus] = useState<'Belum Bayar' | 'Lunas'>('Belum Bayar');
   const [formTanggalBayar, setFormTanggalBayar] = useState(new Date().toISOString().substring(0, 10));
@@ -295,7 +296,7 @@ export const ModulIuran: React.FC<ModulIuranProps> = ({ currentUser, onNavigateT
     }
 
     setFormJenisIuran('IWD (Iuran Warga Digital)');
-    setFormPeriode('September 2026');
+    setFormPeriode(getCurrentDefaultBillingPeriod());
     setFormNominal('');
     setFormStatus('Belum Bayar');
     setFormTanggalBayar(new Date().toISOString().substring(0, 10));
@@ -783,8 +784,11 @@ export const ModulIuran: React.FC<ModulIuranProps> = ({ currentUser, onNavigateT
               className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 text-[11px] focus:outline-none focus:ring-2 focus:ring-emerald-600"
             >
               <option value="all">Semua Periode</option>
-              <option value="September 2026">September 2026</option>
-              <option value="Oktober 2026">Oktober 2026</option>
+              {currentYearBillingPeriods.map(periode => (
+                <option key={periode} value={periode}>
+                  {periode}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -1170,16 +1174,25 @@ export const ModulIuran: React.FC<ModulIuranProps> = ({ currentUser, onNavigateT
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Periode Tagihan:</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 block">Periode Tagihan:</label>
+                    <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      Tahun {new Date().getFullYear()}
+                    </span>
+                  </div>
                   <select
                     value={formPeriode}
                     onChange={e => setFormPeriode(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer font-medium"
                   >
-                    <option value="September 2026">September 2026</option>
-                    <option value="Oktober 2026">Oktober 2026</option>
-                    <option value="November 2026">November 2026</option>
-                    <option value="Desember 2026">Desember 2026</option>
+                    {formPeriode && !currentYearBillingPeriods.includes(formPeriode) && (
+                      <option value={formPeriode}>{formPeriode}</option>
+                    )}
+                    {currentYearBillingPeriods.map(periode => (
+                      <option key={periode} value={periode}>
+                        {periode} {periode === getCurrentDefaultBillingPeriod() ? '• (Bulan Berjalan)' : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

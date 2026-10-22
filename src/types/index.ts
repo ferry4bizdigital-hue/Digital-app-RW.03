@@ -169,6 +169,31 @@ export interface Complaint {
   komentar: ComplaintComment[];
 }
 
+export const BULAN_INDONESIA = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember'
+] as const;
+
+export const getBillingPeriodsForYear = (year: number = new Date().getFullYear()): string[] => {
+  return BULAN_INDONESIA.map(bulan => `${bulan} ${year}`);
+};
+
+export const getCurrentDefaultBillingPeriod = (): string => {
+  const now = new Date();
+  const monthName = BULAN_INDONESIA[now.getMonth()];
+  return `${monthName} ${now.getFullYear()}`;
+};
+
 export type JenisIuran = 'IWD (Iuran Warga Digital)' | 'Kas RT' | 'Kas RW' | 'Sosial & Kematian' | 'Kebersihan';
 
 export interface DueBill {
