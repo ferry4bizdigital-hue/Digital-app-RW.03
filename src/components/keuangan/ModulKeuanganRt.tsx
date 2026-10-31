@@ -47,10 +47,11 @@ const RT_CATEGORIES = [
 export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, onNavigateTab }) => {
   const isSuperAdmin = currentUser.role === 'super_admin';
   const isRtOfficer = currentUser.role === 'pengurus_rt';
+  const isWarga = currentUser.role === 'warga';
   const userRt = StorageService.normalizeRt(currentUser.RT || '01');
 
   // Selected RT for IT Admin / Super Admin (defaults to user's RT or '01')
-  const [selectedRt, setSelectedRt] = useState<string>(isRtOfficer ? userRt : '01');
+  const [selectedRt, setSelectedRt] = useState<string>((isRtOfficer || isWarga) ? userRt : '01');
   const [activeSubTab, setActiveSubTab] = useState<'pengeluaran' | 'penerimaan_iwd' | 'rekap_semua_rt'>('pengeluaran');
 
   // Search & filter states
@@ -87,10 +88,10 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
   // Sync selectedRt when user role changes
   useEffect(() => {
-    if (isRtOfficer) {
+    if (isRtOfficer || isWarga) {
       setSelectedRt(userRt);
     }
-  }, [isRtOfficer, userRt]);
+  }, [isRtOfficer, isWarga, userRt]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -308,12 +309,12 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  {isSuperAdmin ? 'IT Admin Super RW 03' : `Pengurus RT ${userRt}`}
+                  {isSuperAdmin ? 'IT Admin Super RW 03' : isWarga ? `Transparansi Warga RT ${userRt}` : `Pengurus RT ${userRt}`}
                 </span>
                 <span className="text-xs text-slate-400">· Buku Kas Lingkungan</span>
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
-                Kas & Keuangan RT {isRtOfficer ? userRt : selectedRt} RW 03
+                Kas & Keuangan RT {(isRtOfficer || isWarga) ? userRt : selectedRt} RW 03
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
                 Penerimaan otomatis dari total iuran IWD terkumpul, pencatatan pengeluaran RT, dan kalkulasi sisa saldo kas aktif.
@@ -322,13 +323,15 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
           </div>
 
           <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
-            <button
-              onClick={handleOpenAddModal}
-              className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 stroke-[2.4px]" />
-              <span>Catat Pengeluaran RT</span>
-            </button>
+            {!isWarga && (
+              <button
+                onClick={handleOpenAddModal}
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-4 h-4 stroke-[2.4px]" />
+                <span>Catat Pengeluaran RT</span>
+              </button>
+            )}
             <button
               onClick={handleExportCsv}
               className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -647,22 +650,28 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
                         - Rp {item.nominal.toLocaleString('id-ID')}
                       </td>
                       <td className="py-3 px-4 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => handleOpenEditModal(item)}
-                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                            title="Edit Pengeluaran"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenDeleteModal(item)}
-                            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors"
-                            title="Hapus Pengeluaran"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        {!isWarga ? (
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenEditModal(item)}
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                              title="Edit Pengeluaran"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenDeleteModal(item)}
+                              className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors"
+                              title="Hapus Pengeluaran"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-semibold border border-emerald-200">
+                            Terverifikasi RT
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}

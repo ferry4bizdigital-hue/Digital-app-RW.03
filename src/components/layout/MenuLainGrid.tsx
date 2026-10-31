@@ -41,10 +41,10 @@ export const MenuLainGrid: React.FC<MenuLainGridProps> = ({
     {
       id: 'keuangan_rt' as ActiveTab,
       title: 'Kas & Keuangan RT',
-      desc: 'Penerimaan IWD, catat pengeluaran & sisa saldo kas RT',
+      desc: 'Transparansi penerimaan IWD, pengeluaran & sisa saldo kas RT',
       icon: Landmark,
       color: 'bg-emerald-100 text-emerald-900 font-bold',
-      allowed: role === 'super_admin' || role === 'pengurus_rt' || role === 'ketua_rw' || role === 'bendahara',
+      allowed: true,
       isSpecial: true
     },
     {

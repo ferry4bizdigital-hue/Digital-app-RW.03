@@ -23,10 +23,13 @@ import {
   Receipt,
   Search,
   Check,
-  Building2
+  Building2,
+  Landmark,
+  Eye,
+  Filter
 } from 'lucide-react';
 import { StorageService } from '../../services/storageService';
-import { User, DueBill } from '../../types';
+import { User, DueBill, RtExpenseItem } from '../../types';
 import { ActiveTab } from '../layout/BottomNav';
 
 interface WargaDashboardProps {
@@ -38,6 +41,10 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
   const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
   const [rtFilter, setRtFilter] = useState<'all' | 'lunas' | 'belum'>('all');
   const [rtSearch, setRtSearch] = useState('');
+  const [transparansiTab, setTransparansiTab] = useState<'iwd' | 'pengeluaran'>('iwd');
+  const [expenseSearch, setExpenseSearch] = useState('');
+  const [selectedExpenseCategory, setSelectedExpenseCategory] = useState<string>('all');
+  const [selectedExpenseDetail, setSelectedExpenseDetail] = useState<RtExpenseItem | null>(null);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -92,6 +99,28 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
       const matchName = d.namaKepalaKeluarga.toLowerCase().includes(q);
       const matchKk = d.nomorKK.includes(q);
       return matchName || matchKk;
+    }
+    return true;
+  });
+
+  // 4. Data Kas, Realisasi Pengeluaran & Sisa Saldo RT (Transparansi Kas RT untuk Warga)
+  const rtKasSummary = StorageService.getRtKasSummary(currentRt);
+  const totalPengeluaranRt = rtKasSummary.totalPengeluaran;
+  const sisaSaldoRt = rtKasSummary.sisaSaldo;
+  const rtExpensesList = rtKasSummary.expenses;
+
+  const filteredRtExpenses = rtExpensesList.filter(item => {
+    if (selectedExpenseCategory !== 'all' && item.kategori !== selectedExpenseCategory) {
+      return false;
+    }
+    if (expenseSearch.trim()) {
+      const q = expenseSearch.toLowerCase();
+      const matchKet = item.keterangan.toLowerCase().includes(q);
+      const matchKat = item.kategori.toLowerCase().includes(q);
+      const matchPencatat = item.pencatat.toLowerCase().includes(q);
+      const matchNominal = item.nominal.toString().includes(q);
+      const matchTanggal = item.tanggal.includes(q);
+      return matchKet || matchKat || matchPencatat || matchNominal || matchTanggal;
     }
     return true;
   });
@@ -368,128 +397,305 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
           </div>
         </div>
 
-        {/* Transparansi Iuran Warga RT Warga yang Login */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+        {/* Transparansi Iuran Wajib, Pengeluaran & Sisa Saldo RT Warga yang Login */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs">
+          {/* Header Card */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4">
             <div>
-              <h4 className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                  Wilayah RT {currentRt}
+                </span>
+                <span className="text-xs text-slate-400">· Akuntabilitas Lingkungan</span>
+              </div>
+              <h4 className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-1.5 mt-0.5">
                 <Building2 className="w-4 h-4 text-emerald-700" />
-                <span>Transparansi Iuran Wajib Warga RT {currentRt}</span>
+                <span>Transparansi Iuran Wajib & Kas RT {currentRt}</span>
               </h4>
-              <p className="text-[11px] text-slate-500">
-                Status pembayaran IWD warga tetangga di lingkungan RT {currentRt} / RW 03
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                Penerimaan IWD terkumpul, realisasi belanja/pengeluaran RT, dan sisa saldo kas aktif RT {currentRt}
               </p>
             </div>
 
-            {/* Quick Filter Status */}
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs w-full sm:w-auto">
-              <button
-                onClick={() => setRtFilter('all')}
-                className={`flex-1 sm:flex-initial text-center px-2 py-1 rounded-lg font-medium text-[11px] transition-colors cursor-pointer ${
-                  rtFilter === 'all' ? 'bg-white text-slate-900 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Semua ({totalRtKk})
-              </button>
-              <button
-                onClick={() => setRtFilter('lunas')}
-                className={`flex-1 sm:flex-initial text-center px-2 py-1 rounded-lg font-medium text-[11px] transition-colors cursor-pointer ${
-                  rtFilter === 'lunas' ? 'bg-emerald-700 text-white font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Sudah Bayar ({lunasRtCount})
-              </button>
-              <button
-                onClick={() => setRtFilter('belum')}
-                className={`flex-1 sm:flex-initial text-center px-2 py-1 rounded-lg font-medium text-[11px] transition-colors cursor-pointer ${
-                  rtFilter === 'belum' ? 'bg-rose-700 text-white font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Belum Bayar ({belumRtCount})
-              </button>
+            <button
+              onClick={() => onNavigateTab('keuangan_rt')}
+              className="text-xs font-semibold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all self-start sm:self-auto cursor-pointer shadow-2xs"
+            >
+              <Landmark className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Buku Kas RT {currentRt}</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* 3 Metrics: Penerimaan IWD, Total Pengeluaran RT, Sisa Saldo RT */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
+            {/* 1. Penerimaan IWD */}
+            <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  Penerimaan IWD
+                </span>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded-full">
+                  {persenLunas}% Lunas
+                </span>
+              </div>
+              <div className="text-base sm:text-lg font-bold font-mono text-emerald-900">
+                Rp {rtKasSummary.totalPenerimaanIwd.toLocaleString('id-ID')}
+              </div>
+              <div className="text-[10px] text-emerald-700 mt-0.5">
+                {lunasRtCount} dari {totalRtKk} KK telah bayar
+              </div>
+            </div>
+
+            {/* 2. Total Pengeluaran RT */}
+            <div className="p-3 bg-rose-50/70 rounded-xl border border-rose-200">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1">
+                  <TrendingDown className="w-3.5 h-3.5 text-rose-600" />
+                  Total Pengeluaran RT
+                </span>
+                <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded-full">
+                  {rtKasSummary.countPengeluaran} Transaksi
+                </span>
+              </div>
+              <div className="text-base sm:text-lg font-bold font-mono text-rose-800">
+                Rp {totalPengeluaranRt.toLocaleString('id-ID')}
+              </div>
+              <div className="text-[10px] text-rose-600 mt-0.5">
+                Realisasi belanja / kegiatan lingkungan
+              </div>
+            </div>
+
+            {/* 3. Sisa Saldo RT */}
+            <div className={`p-3 rounded-xl border ${
+              sisaSaldoRt >= 0 
+                ? 'bg-gradient-to-br from-emerald-100/70 to-teal-50 border-emerald-300' 
+                : 'bg-rose-100/70 border-rose-300'
+            }`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1">
+                  <Wallet className="w-3.5 h-3.5 text-emerald-700" />
+                  Sisa Saldo Kas RT
+                </span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                  sisaSaldoRt >= 0 ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900'
+                }`}>
+                  {sisaSaldoRt >= 0 ? 'Surplus Kas' : 'Defisit Kas'}
+                </span>
+              </div>
+              <div className={`text-base sm:text-lg font-extrabold font-mono ${
+                sisaSaldoRt >= 0 ? 'text-emerald-950' : 'text-rose-900'
+              }`}>
+                Rp {sisaSaldoRt.toLocaleString('id-ID')}
+              </div>
+              <div className="text-[10px] text-slate-600 mt-0.5">
+                Penerimaan IWD - Pengeluaran RT
+              </div>
             </div>
           </div>
 
-          {/* Mini Ringkasan Capaian RT */}
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-3 p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-center">
-            <div>
-              <span className="text-[10px] text-slate-400 block truncate">Kepatuhan</span>
-              <span className="text-xs sm:text-sm font-bold font-mono text-emerald-700">{persenLunas}%</span>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 block truncate">Sudah Bayar</span>
-              <span className="text-xs sm:text-sm font-bold font-mono text-slate-800">{lunasRtCount} / {totalRtKk} KK</span>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 block truncate">Dana RT</span>
-              <span className="text-xs sm:text-sm font-bold font-mono text-emerald-700 truncate block">Rp {totalDanaTerkumpulRt.toLocaleString('id-ID')}</span>
-            </div>
-          </div>
+          {/* Sub-Tab Navigation: Status IWD vs Rincian Pengeluaran RT */}
+          <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2.5 mb-3 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setTransparansiTab('iwd')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  transparansiTab === 'iwd'
+                    ? 'bg-emerald-700 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Status IWD Warga ({totalRtKk} KK)</span>
+              </button>
 
-          {/* List Warga RT & Keterangan Bayar */}
-          <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-100">
-            {filteredRtDues.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-400">
-                Tidak ada data warga di RT {currentRt} yang cocok.
+              <button
+                onClick={() => setTransparansiTab('pengeluaran')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  transparansiTab === 'pengeluaran'
+                    ? 'bg-emerald-700 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                <span>Daftar Pengeluaran RT ({rtKasSummary.countPengeluaran})</span>
+              </button>
+            </div>
+
+            {/* Quick Filter Pill Buttons when on IWD tab */}
+            {transparansiTab === 'iwd' ? (
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-xs">
+                <button
+                  onClick={() => setRtFilter('all')}
+                  className={`px-2 py-0.5 rounded-md font-medium text-[11px] transition-colors cursor-pointer ${
+                    rtFilter === 'all' ? 'bg-white text-slate-900 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Semua ({totalRtKk})
+                </button>
+                <button
+                  onClick={() => setRtFilter('lunas')}
+                  className={`px-2 py-0.5 rounded-md font-medium text-[11px] transition-colors cursor-pointer ${
+                    rtFilter === 'lunas' ? 'bg-emerald-700 text-white font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Sudah ({lunasRtCount})
+                </button>
+                <button
+                  onClick={() => setRtFilter('belum')}
+                  className={`px-2 py-0.5 rounded-md font-medium text-[11px] transition-colors cursor-pointer ${
+                    rtFilter === 'belum' ? 'bg-rose-700 text-white font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Belum ({belumRtCount})
+                </button>
               </div>
             ) : (
-              filteredRtDues.map((item) => {
-                const isMine = item.nomorKK === myFamily.nomorKK || 
-                  item.namaKepalaKeluarga.toLowerCase() === myFamily.namaKepalaKeluarga.toLowerCase() ||
-                  item.namaKepalaKeluarga.toLowerCase() === currentUser.nama.toLowerCase();
-
-                const isPaid = item.status === 'Lunas';
-
-                return (
-                  <div 
-                    key={item.id} 
-                    className={`p-2.5 flex items-center justify-between gap-2 text-xs transition-colors ${
-                      isMine ? 'bg-emerald-50/70 hover:bg-emerald-50 border-l-3 border-emerald-600' : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-slate-900 truncate">
-                          {item.namaKepalaKeluarga}
-                        </span>
-                        {isMine && (
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-200 text-emerald-900 shrink-0">
-                            Keluarga Anda
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-2">
-                        <span>KK: {StorageService.maskNik(item.nomorKK, false)}</span>
-                        <span>·</span>
-                        <span>Rp {item.nominal.toLocaleString('id-ID')}</span>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      {isPaid ? (
-                        <div>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                            <Check className="w-3 h-3 text-emerald-600" />
-                            <span>Sudah Bayar</span>
-                          </span>
-                          <span className="block text-[9px] text-slate-400 mt-0.5">
-                            {item.metodeBayar || 'Lunas'}
-                          </span>
-                        </div>
-                      ) : (
-                        <div>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
-                            <Clock className="w-3 h-3 text-rose-600" />
-                            <span>Belum Bayar</span>
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
+              <div className="text-[11px] text-slate-500 font-medium">
+                Pengeluaran transparan RT {currentRt}
+              </div>
             )}
           </div>
+
+          {/* TAB CONTENT: 1. STATUS IWD WARGA */}
+          {transparansiTab === 'iwd' && (
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari kepala keluarga / No KK..."
+                  value={rtSearch}
+                  onChange={e => setRtSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-100">
+                {filteredRtDues.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-400">
+                    Tidak ada data warga di RT {currentRt} yang cocok.
+                  </div>
+                ) : (
+                  filteredRtDues.map((item) => {
+                    const isMine = item.nomorKK === myFamily.nomorKK || 
+                      item.namaKepalaKeluarga.toLowerCase() === myFamily.namaKepalaKeluarga.toLowerCase() ||
+                      item.namaKepalaKeluarga.toLowerCase() === currentUser.nama.toLowerCase();
+
+                    const isPaid = item.status === 'Lunas';
+
+                    return (
+                      <div 
+                        key={item.id} 
+                        className={`p-2.5 flex items-center justify-between gap-2 text-xs transition-colors ${
+                          isMine ? 'bg-emerald-50/70 hover:bg-emerald-50 border-l-3 border-emerald-600' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-slate-900 truncate">
+                              {item.namaKepalaKeluarga}
+                            </span>
+                            {isMine && (
+                              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-200 text-emerald-900 shrink-0">
+                                Keluarga Anda
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-2">
+                            <span>KK: {StorageService.maskNik(item.nomorKK, false)}</span>
+                            <span>·</span>
+                            <span>Rp {item.nominal.toLocaleString('id-ID')}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          {isPaid ? (
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                <Check className="w-3 h-3 text-emerald-600" />
+                                <span>Sudah Bayar</span>
+                              </span>
+                              <span className="block text-[9px] text-slate-400 mt-0.5">
+                                {item.metodeBayar || 'Lunas'}
+                              </span>
+                            </div>
+                          ) : (
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                                <Clock className="w-3 h-3 text-rose-600" />
+                                <span>Belum Bayar</span>
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB CONTENT: 2. RINCIAN PENGELUARAN RT TERINPUT */}
+          {transparansiTab === 'pengeluaran' && (
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari pengeluaran, keperluan belanja..."
+                  value={expenseSearch}
+                  onChange={e => setExpenseSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-100">
+                {filteredRtExpenses.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400">
+                    <Receipt className="w-7 h-7 mx-auto mb-1.5 text-slate-300" />
+                    <span>Belum ada rincian pengeluaran yang dicatat untuk RT {currentRt}.</span>
+                  </div>
+                ) : (
+                  filteredRtExpenses.map((exp) => (
+                    <div 
+                      key={exp.id} 
+                      onClick={() => setSelectedExpenseDetail(exp)}
+                      className="p-2.5 flex items-start justify-between gap-2.5 text-xs hover:bg-slate-50 transition-colors cursor-pointer group"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-slate-900 group-hover:text-emerald-800 transition-colors">
+                            {exp.keterangan}
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-700">
+                            {exp.kategori}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+                          <span>📅 {exp.tanggal}</span>
+                          <span>·</span>
+                          <span>Dicatat: {exp.pencatat}</span>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="font-bold text-rose-700 font-mono text-xs sm:text-sm">
+                          - Rp {exp.nominal.toLocaleString('id-ID')}
+                        </div>
+                        <span className="text-[10px] text-emerald-700 group-hover:underline flex items-center justify-end gap-0.5 mt-0.5">
+                          <Eye className="w-3 h-3" />
+                          <span>Rincian</span>
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -846,6 +1052,78 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
                   Tutup Data Keluarga
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detail Pengeluaran RT untuk Warga */}
+      {selectedExpenseDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 p-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                  <Receipt className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Detail Pengeluaran RT {currentRt}</h3>
+                  <p className="text-[11px] text-slate-400">Transparansi kas lingkungan warga</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedExpenseDetail(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-xl text-center">
+                <span className="text-[10px] text-rose-600 uppercase font-semibold block">Besaran Pengeluaran</span>
+                <span className="text-xl font-bold font-mono text-rose-900 block mt-0.5">
+                  Rp {selectedExpenseDetail.nominal.toLocaleString('id-ID')}
+                </span>
+              </div>
+
+              <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Tanggal Realisasi:</span>
+                  <span className="font-semibold text-slate-800">{selectedExpenseDetail.tanggal}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Pos / Kategori:</span>
+                  <span className="font-semibold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
+                    {selectedExpenseDetail.kategori}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Petugas Pencatat:</span>
+                  <span className="font-semibold text-slate-800">{selectedExpenseDetail.pencatat}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block mb-1">Rincian Keperluan:</span>
+                  <p className="p-2 bg-white rounded-lg border border-slate-200 font-medium text-slate-800 text-xs leading-relaxed">
+                    {selectedExpenseDetail.keterangan}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 text-[11px]">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Pengeluaran ini telah diverifikasi dan tercatat resmi dalam Buku Kas RT {currentRt}.</span>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedExpenseDetail(null)}
+                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Tutup Detail
+              </button>
             </div>
           </div>
         </div>
