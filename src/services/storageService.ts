@@ -15,7 +15,8 @@ import {
   StatusSurat,
   SetoranIwdRt,
   WargaNgontrakUsaha,
-  SetoranRtChoice
+  SetoranRtChoice,
+  RtExpenseItem
 } from '../types';
 import { FirestoreSyncService } from './firestoreSyncService';
 
@@ -34,7 +35,8 @@ import {
   INITIAL_AUDIT_LOGS,
   INITIAL_EMERGENCY_CONTACTS,
   INITIAL_SETORAN_RT,
-  INITIAL_WARGA_NGONTRAK_USAHA
+  INITIAL_WARGA_NGONTRAK_USAHA,
+  INITIAL_RT_EXPENSES
 } from '../data/mockData';
 
 const STORAGE_KEYS = {
@@ -52,6 +54,7 @@ const STORAGE_KEYS = {
   DUES: 'rw03_dues',
   TRANSACTIONS: 'rw03_transactions',
   SETORAN_RT: 'rw03_setoran_rt',
+  RT_EXPENSES: 'rw03_rt_expenses',
   INVENTORY: 'rw03_inventory',
   NOTIFICATIONS: 'rw03_notifications',
   AUDIT_LOGS: 'rw03_audit_logs',
@@ -223,6 +226,7 @@ export class StorageService {
       dues: this.getDues(),
       transactions: this.getTransactions(),
       setoranRt: this.getSetoranRt(),
+      rtExpenses: this.getRtExpenses(),
       inventory: this.getInventory(),
       notifications: this.getNotifications(),
       auditLogs: this.getAuditLogs(),
@@ -346,6 +350,11 @@ export class StorageService {
     // 11. Setoran RT ke RW (Setoran RT) - Sinkron penuh
     if (Array.isArray(serverData.setoranRt)) {
       setStorage(STORAGE_KEYS.SETORAN_RT, serverData.setoranRt, false);
+    }
+
+    // 11b. Pengeluaran Kas RT (RT Expenses) - Sinkron penuh
+    if (Array.isArray(serverData.rtExpenses)) {
+      setStorage(STORAGE_KEYS.RT_EXPENSES, serverData.rtExpenses, false);
     }
 
     // 12. Inventaris (Inventory) - Sinkron penuh
@@ -2359,6 +2368,140 @@ export class StorageService {
     return newRecord;
   }
 
+  // --- KAS & KEUANGAN RT (PENERIMAAN IWD & PENGELUARAN RT) ---
+  public static getRtExpenses(targetRt?: string): RtExpenseItem[] {
+    const list = getStorage<RtExpenseItem[]>(STORAGE_KEYS.RT_EXPENSES, INITIAL_RT_EXPENSES);
+    if (!targetRt || targetRt === 'all') return list;
+    const cleanRt = this.normalizeRt(targetRt);
+    return list.filter(item => this.normalizeRt(item.rt) === cleanRt);
+  }
+
+  public static addRtExpense(data: Omit<RtExpenseItem, 'id' | 'createdAt'>): RtExpenseItem {
+    const list = getStorage<RtExpenseItem[]>(STORAGE_KEYS.RT_EXPENSES, INITIAL_RT_EXPENSES);
+    const effectiveRt = this.normalizeRt(data.rt);
+    const newRecord: RtExpenseItem = {
+      ...data,
+      rt: effectiveRt,
+      id: `rtexp-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    };
+
+    list.unshift(newRecord);
+    setStorage(STORAGE_KEYS.RT_EXPENSES, list);
+
+    const cur = this.getCurrentUser();
+    this.logAction(
+      cur.userId,
+      cur.nama,
+      cur.role,
+      'CATAT_TRANSAKSI',
+      'Keuangan',
+      newRecord.id,
+      `Catat Pengeluaran RT ${effectiveRt} Rp ${newRecord.nominal.toLocaleString('id-ID')} (${newRecord.kategori}): ${newRecord.keterangan}`
+    );
+
+    this.pushToServer(true).catch(err => console.warn('[StorageService] Push error on addRtExpense:', err));
+    this.notify();
+    return newRecord;
+  }
+
+  public static updateRtExpense(id: string, updates: Partial<RtExpenseItem>): boolean {
+    const list = getStorage<RtExpenseItem[]>(STORAGE_KEYS.RT_EXPENSES, INITIAL_RT_EXPENSES);
+    const index = list.findIndex(e => e.id === id);
+    if (index === -1) return false;
+
+    list[index] = {
+      ...list[index],
+      ...updates,
+      rt: updates.rt ? this.normalizeRt(updates.rt) : list[index].rt,
+      updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    };
+
+    setStorage(STORAGE_KEYS.RT_EXPENSES, list);
+
+    const cur = this.getCurrentUser();
+    this.logAction(
+      cur.userId,
+      cur.nama,
+      cur.role,
+      'EDIT_TRANSAKSI',
+      'Keuangan',
+      id,
+      `Perbarui Pengeluaran RT ${list[index].rt} Rp ${list[index].nominal.toLocaleString('id-ID')}: ${list[index].keterangan}`
+    );
+
+    this.pushToServer(true).catch(err => console.warn('[StorageService] Push error on updateRtExpense:', err));
+    this.notify();
+    return true;
+  }
+
+  public static deleteRtExpense(id: string): boolean {
+    const list = getStorage<RtExpenseItem[]>(STORAGE_KEYS.RT_EXPENSES, INITIAL_RT_EXPENSES);
+    const target = list.find(e => e.id === id);
+    if (!target) return false;
+
+    const remaining = list.filter(e => e.id !== id);
+    setStorage(STORAGE_KEYS.RT_EXPENSES, remaining);
+
+    const cur = this.getCurrentUser();
+    this.logAction(
+      cur.userId,
+      cur.nama,
+      cur.role,
+      'HAPUS_TRANSAKSI',
+      'Keuangan',
+      id,
+      `Hapus Pengeluaran RT ${target.rt} Rp ${target.nominal.toLocaleString('id-ID')} (${target.kategori}): ${target.keterangan}`
+    );
+
+    this.pushToServer(true).catch(err => console.warn('[StorageService] Push error on deleteRtExpense:', err));
+    this.notify();
+    return true;
+  }
+
+  /**
+   * Mengambil ringkasan Kas & Keuangan RT:
+   * 1. Penerimaan RT = total penerimaan Iuran Warga Digital (IWD) berstatus 'Lunas' di RT tersebut
+   * 2. Pengeluaran RT = total pengeluaran yang diinput oleh RT / IT Admin
+   * 3. Sisa Saldo Kas & Keuangan RT = Penerimaan IWD - Total Pengeluaran
+   */
+  public static getRtKasSummary(rtInput: string) {
+    const cleanRt = this.normalizeRt(rtInput);
+    const dues = this.getDues();
+
+    // Penerimaan: datanya bersumber murni dari total penerimaan IWD terkumpul (Lunas)
+    const paidDues = dues.filter(d => this.normalizeRt(d.rt) === cleanRt && d.status === 'Lunas');
+    const totalPenerimaanIwd = paidDues.reduce((sum, d) => sum + (d.nominal || 0), 0);
+    const countIwdLunas = paidDues.length;
+
+    // Pengeluaran RT yang dapat diinput
+    const expenses = this.getRtExpenses(cleanRt);
+    const totalPengeluaran = expenses.reduce((sum, e) => sum + (e.nominal || 0), 0);
+    const countPengeluaran = expenses.length;
+
+    // Sisa Saldo Kas & Keuangan RT
+    const sisaSaldo = totalPenerimaanIwd - totalPengeluaran;
+
+    return {
+      rt: cleanRt,
+      totalPenerimaanIwd,
+      countIwdLunas,
+      totalPengeluaran,
+      countPengeluaran,
+      sisaSaldo,
+      paidDues,
+      expenses
+    };
+  }
+
+  /**
+   * Mengambil rekapitulasi Kas & Keuangan seluruh RT (RT 01 s/d RT 05) untuk IT Admin / RW
+   */
+  public static getAllRtKasSummary() {
+    const rtList = ['01', '02', '03', '04', '05'];
+    return rtList.map(rt => this.getRtKasSummary(rt));
+  }
+
   // --- INVENTARIS ---
   public static getInventory(): InventoryItem[] {
     return getStorage<InventoryItem[]>(STORAGE_KEYS.INVENTORY, []);
@@ -2751,6 +2894,7 @@ export class StorageService {
     setStorage(STORAGE_KEYS.DUES, INITIAL_DUES);
     setStorage(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
     setStorage(STORAGE_KEYS.SETORAN_RT, INITIAL_SETORAN_RT);
+    setStorage(STORAGE_KEYS.RT_EXPENSES, INITIAL_RT_EXPENSES);
     setStorage(STORAGE_KEYS.INVENTORY, INITIAL_INVENTORY);
     setStorage(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
     setStorage(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);

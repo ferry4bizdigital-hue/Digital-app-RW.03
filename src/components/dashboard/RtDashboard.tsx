@@ -14,7 +14,8 @@ import {
   HeartPulse,
   GraduationCap,
   Briefcase,
-  Baby
+  Baby,
+  Landmark
 } from 'lucide-react';
 import { StorageService } from '../../services/storageService';
 import { User, Resident, FamilyCard } from '../../types';
@@ -336,14 +337,23 @@ export const RtDashboard: React.FC<RtDashboardProps> = ({ currentUser, onNavigat
             </p>
           </div>
 
-          <button
-            onClick={() => onNavigateTab('iuran')}
-            className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer self-start sm:self-auto"
-          >
-            <Wallet className="w-3.5 h-3.5" />
-            <span>Kelola IWD RT {rtCode}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <button
+              onClick={() => onNavigateTab('keuangan_rt')}
+              className="px-3.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+            >
+              <Landmark className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Kas & Keuangan RT {rtCode}</span>
+            </button>
+            <button
+              onClick={() => onNavigateTab('iuran')}
+              className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              <span>Kelola IWD RT {rtCode}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* 3 Metrics Cards for RT */}

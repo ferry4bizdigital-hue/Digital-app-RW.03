@@ -12,7 +12,8 @@ import {
   Wallet,
   CheckCircle2,
   UserCheck,
-  Store
+  Store,
+  Landmark
 } from 'lucide-react';
 import { StorageService } from '../../services/storageService';
 import { ActiveTab } from '../layout/BottomNav';
@@ -112,6 +113,13 @@ export const RwDashboard: React.FC<RwDashboardProps> = ({ currentUser, onNavigat
                 >
                   <Store className="w-3.5 h-3.5 text-slate-950" />
                   <span>Warga Ngontrak Usaha</span>
+                </button>
+                <button
+                  onClick={() => onNavigateTab('keuangan_rt')}
+                  className="px-3.5 py-1.5 bg-emerald-200 hover:bg-white text-emerald-950 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-md hover:shadow-lg cursor-pointer"
+                >
+                  <Landmark className="w-3.5 h-3.5 text-emerald-800" />
+                  <span>Kas & Keuangan RT</span>
                 </button>
               </>
             )}

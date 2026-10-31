@@ -20,6 +20,7 @@ import { PengajuanSurat } from './components/surat/PengajuanSurat';
 import { ModulPengaduan } from './components/pengaduan/ModulPengaduan';
 import { ModulIuran } from './components/iuran/ModulIuran';
 import { ModulKeuangan } from './components/keuangan/ModulKeuangan';
+import { ModulKeuanganRt } from './components/keuangan/ModulKeuanganRt';
 import { ModulInventaris } from './components/inventaris/ModulInventaris';
 import { PengumumanAgenda } from './components/pengumuman/PengumumanAgenda';
 import { ModulLayananDarurat } from './components/layanan/ModulLayananDarurat';
@@ -141,6 +142,9 @@ export default function App() {
 
       case 'keuangan':
         return <ModulKeuangan currentUser={currentUser} onNavigateTab={setActiveTab} />;
+
+      case 'keuangan_rt':
+        return <ModulKeuanganRt currentUser={currentUser} onNavigateTab={setActiveTab} />;
 
       case 'inventaris':
         return <ModulInventaris currentUser={currentUser} />;

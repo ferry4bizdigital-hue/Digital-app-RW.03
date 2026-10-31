@@ -22,6 +22,7 @@ export type ActiveTab =
   | 'pengaduan' 
   | 'iuran' 
   | 'keuangan' 
+  | 'keuangan_rt'
   | 'inventaris' 
   | 'pengumuman' 
   | 'agenda' 
@@ -100,7 +101,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         {items.map(item => {
           const Icon = item.icon;
           const isItemInBottomNav = items.some(it => it.id === activeTab);
-          const isActive = activeTab === item.id || (item.id === 'menu_lain' && !isItemInBottomNav && ['keuangan', 'inventaris', 'pengumuman', 'agenda', 'layanan', 'audit', 'kk', 'iuran', 'surat', 'pengurus'].includes(activeTab));
+          const isActive = activeTab === item.id || (item.id === 'menu_lain' && !isItemInBottomNav && ['keuangan', 'keuangan_rt', 'inventaris', 'pengumuman', 'agenda', 'layanan', 'audit', 'kk', 'iuran', 'surat', 'pengurus', 'ngontrak_usaha', 'google_drive'].includes(activeTab));
           
           return (
             <button

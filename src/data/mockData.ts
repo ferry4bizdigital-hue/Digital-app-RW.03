@@ -13,7 +13,8 @@ import {
   AuditLog,
   EmergencyContact,
   SetoranIwdRt,
-  WargaNgontrakUsaha
+  WargaNgontrakUsaha,
+  RtExpenseItem
 } from '../types';
 
 export const INITIAL_USERS: User[] = [
@@ -216,3 +217,69 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
 export const INITIAL_SETORAN_RT: SetoranIwdRt[] = [];
 
 export const INITIAL_WARGA_NGONTRAK_USAHA: WargaNgontrakUsaha[] = [];
+
+export const INITIAL_RT_EXPENSES: RtExpenseItem[] = [
+  {
+    id: 'rtexp-01-01',
+    rt: '01',
+    tanggal: '2026-10-12',
+    kategori: 'Kebersihan & Lingkungan',
+    nominal: 85000,
+    keterangan: 'Pembelian kantong sampah besar & sapu lidi kerja bakti RT 01',
+    pencatat: 'Ahmad Suparman (Ketua RT 01)'
+  },
+  {
+    id: 'rtexp-01-02',
+    rt: '01',
+    tanggal: '2026-10-24',
+    kategori: 'Perbaikan Fasum & PJU',
+    nominal: 120000,
+    keterangan: 'Penggantian lampu LED penerangan jalan gang RT 01 (2 unit)',
+    pencatat: 'Ahmad Suparman (Ketua RT 01)'
+  },
+  {
+    id: 'rtexp-02-01',
+    rt: '02',
+    tanggal: '2026-10-08',
+    kategori: 'Konsumsi Rapat & Kerja Bakti',
+    nominal: 150000,
+    keterangan: 'Konsumsi dan air mineral kerja bakti normalisasi saluran drainase RT 02',
+    pencatat: 'Budi Santoso (Ketua RT 02)'
+  },
+  {
+    id: 'rtexp-02-02',
+    rt: '02',
+    tanggal: '2026-10-18',
+    kategori: 'Operasional RT & ATK',
+    nominal: 45000,
+    keterangan: 'Buku kas, map dokumen kependudukan & pulpen sekretariat RT 02',
+    pencatat: 'Budi Santoso (Ketua RT 02)'
+  },
+  {
+    id: 'rtexp-03-01',
+    rt: '03',
+    tanggal: '2026-10-14',
+    kategori: 'Kebersihan & Lingkungan',
+    nominal: 75000,
+    keterangan: 'Pengadaan bubuk abate jentik nyamuk dan cairan pembersih got RT 03',
+    pencatat: 'Cecep Hidayat (Ketua RT 03)'
+  },
+  {
+    id: 'rtexp-04-01',
+    rt: '04',
+    tanggal: '2026-10-11',
+    kategori: 'Keamanan & Ronda',
+    nominal: 60000,
+    keterangan: 'Perbaikan gembok dan engsel pintu pos ronda RT 04',
+    pencatat: 'Dedi Kurniawan (Ketua RT 04)'
+  },
+  {
+    id: 'rtexp-05-01',
+    rt: '05',
+    tanggal: '2026-10-16',
+    kategori: 'Keamanan & Ronda',
+    nominal: 95000,
+    keterangan: 'Senter cas patroli malam pos siskamling RT 05',
+    pencatat: 'Eko Prasetyo (Ketua RT 05)'
+  }
+];

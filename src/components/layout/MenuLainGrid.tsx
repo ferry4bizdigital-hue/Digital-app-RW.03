@@ -18,7 +18,8 @@ import {
   Receipt,
   UserCheck,
   Store,
-  HardDrive
+  HardDrive,
+  Landmark
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import { ActiveTab } from '../layout/BottomNav';
@@ -37,6 +38,15 @@ export const MenuLainGrid: React.FC<MenuLainGridProps> = ({
   const isPengurus = role !== 'warga';
 
   const menuItems = [
+    {
+      id: 'keuangan_rt' as ActiveTab,
+      title: 'Kas & Keuangan RT',
+      desc: 'Penerimaan IWD, catat pengeluaran & sisa saldo kas RT',
+      icon: Landmark,
+      color: 'bg-emerald-100 text-emerald-900 font-bold',
+      allowed: role === 'super_admin' || role === 'pengurus_rt' || role === 'ketua_rw' || role === 'bendahara',
+      isSpecial: true
+    },
     {
       id: 'pengurus' as ActiveTab,
       title: 'Pendaftaran Pengurus RT/RW',

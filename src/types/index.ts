@@ -231,6 +231,19 @@ export interface FinancialTransaction {
   runningSaldo?: number;
 }
 
+export interface RtExpenseItem {
+  id: string;
+  rt: string;
+  tanggal: string;
+  kategori: string;
+  nominal: number;
+  keterangan: string;
+  pencatat: string;
+  buktiNota?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export type KondisiBarang = 'Sangat Baik' | 'Baik' | 'Perlu Perbaikan' | 'Rusak';
 export type StatusBarang = 'Tersedia' | 'Sedang Dipinjam' | 'Dalam Perbaikan';
 
