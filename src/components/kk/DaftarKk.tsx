@@ -72,13 +72,19 @@ export const DaftarKk: React.FC<DaftarKkProps> = ({ currentUser }) => {
     }
   }, [currentUser.role, currentUser.RT, userRt]);
 
-  // Subscribe to Storage changes
+  // Subscribe to Storage changes & baca filter RT dari dashboard jika ada
   useEffect(() => {
+    const savedRt = sessionStorage.getItem('rw03_filter_rt_kk');
+    if (savedRt && !isRtRole) {
+      sessionStorage.removeItem('rw03_filter_rt_kk');
+      setSelectedRt(savedRt);
+    }
+
     const unsubscribe = StorageService.subscribe(() => {
       setFamilies(StorageService.getFamilies());
     });
     return unsubscribe;
-  }, []);
+  }, [isRtRole]);
 
   // Helper untuk otorisasi edit & hapus KK: Super Admin se-RW, RT 01-05 untuk wilayah RT masing-masing
   const canManageFamily = (fam?: FamilyCard | null): boolean => {

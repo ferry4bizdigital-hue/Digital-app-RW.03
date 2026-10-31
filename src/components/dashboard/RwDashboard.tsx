@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, 
   Home, 
@@ -52,6 +52,49 @@ export const RwDashboard: React.FC<RwDashboardProps> = ({ currentUser, onNavigat
   const totalPindah = movedResidents.length;
   const totalKk = families.length;
   const pengaduanAktif = complaints.filter(c => c.status === 'Baru' || c.status === 'Diproses').length;
+
+  // Pilihan data RT yang ingin dilihat (untuk role Super Admin, RW, dan Bendahara RW)
+  const [selectedWargaRt, setSelectedWargaRt] = useState<string>('all');
+  const [selectedKkRt, setSelectedKkRt] = useState<string>('all');
+
+  // Filter Warga berdasarkan pilihan RT (Semua RT atau spesifik RT 01 s/d RT 05)
+  const displayActiveResidents = useMemo(() => {
+    if (selectedWargaRt === 'all') return activeResidents;
+    return activeResidents.filter(r => StorageService.normalizeRt(r.rt) === selectedWargaRt);
+  }, [activeResidents, selectedWargaRt]);
+
+  const displayDeceasedResidents = useMemo(() => {
+    if (selectedWargaRt === 'all') return deceasedResidents;
+    return deceasedResidents.filter(r => StorageService.normalizeRt(r.rt) === selectedWargaRt);
+  }, [deceasedResidents, selectedWargaRt]);
+
+  const displayMovedResidents = useMemo(() => {
+    if (selectedWargaRt === 'all') return movedResidents;
+    return movedResidents.filter(r => StorageService.normalizeRt(r.rt) === selectedWargaRt);
+  }, [movedResidents, selectedWargaRt]);
+
+  const displayWargaCount = displayActiveResidents.length;
+  const displayLakiCount = displayActiveResidents.filter(r => r.jenisKelamin === 'L').length;
+  const displayPerempuanCount = displayActiveResidents.filter(r => r.jenisKelamin === 'P').length;
+  const displayDeceasedCount = displayDeceasedResidents.length;
+  const displayMovedCount = displayMovedResidents.length;
+
+  // Filter Kartu Keluarga berdasarkan pilihan RT (Semua RT atau spesifik RT 01 s/d RT 05)
+  const displayFamilies = useMemo(() => {
+    if (selectedKkRt === 'all') return families;
+    return families.filter(f => StorageService.normalizeRt(f.rt) === selectedKkRt);
+  }, [families, selectedKkRt]);
+
+  const displayKkCount = displayFamilies.length;
+
+  const wargaInSelectedKkRt = useMemo(() => {
+    if (selectedKkRt === 'all') return activeResidents.length;
+    return activeResidents.filter(r => StorageService.normalizeRt(r.rt) === selectedKkRt).length;
+  }, [activeResidents, selectedKkRt]);
+
+  const rataRataJiwaPerKk = displayKkCount > 0 
+    ? (wargaInSelectedKkRt / displayKkCount).toFixed(1)
+    : '0';
 
   // Demographics: Residents per RT (hanya warga aktif)
   const rtList = ['01', '02', '03', '04', '05'];
@@ -150,33 +193,72 @@ export const RwDashboard: React.FC<RwDashboardProps> = ({ currentUser, onNavigat
 
       {/* Primary Key Metrics Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Total Warga */}
+        {/* Total Warga - Pilihan RT untuk Super Admin, RW & Bendahara RW */}
         <div 
-          onClick={() => onNavigateTab('warga')}
-          className="p-4 bg-white rounded-xl border border-slate-200 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs hover:shadow-xs group"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('rw03_filter_rt_warga', selectedWargaRt);
+            }
+            onNavigateTab('warga');
+          }}
+          className="p-4 bg-white rounded-2xl border border-slate-200 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs hover:shadow-xs group flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-medium">Total Warga Terdata</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-              <Users className="w-4 h-4" />
+          <div>
+            <div className="flex items-center justify-between text-slate-500 mb-2 gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-xs font-semibold text-slate-700 truncate">Total Warga</span>
+                {selectedWargaRt !== 'all' ? (
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
+                    RT {selectedWargaRt}
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-600 shrink-0">
+                    Semua RT
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <select
+                  value={selectedWargaRt}
+                  onChange={(e) => setSelectedWargaRt(e.target.value)}
+                  className="text-[10px] sm:text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg px-2 py-0.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer transition-colors shadow-2xs"
+                  title="Pilih data RT yang ingin dilihat"
+                >
+                  <option value="all">Semua RT (RW 03)</option>
+                  <option value="01">RT 01</option>
+                  <option value="02">RT 02</option>
+                  <option value="03">RT 03</option>
+                  <option value="04">RT 04</option>
+                  <option value="05">RT 05</option>
+                </select>
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:bg-emerald-100 transition-colors shrink-0">
+                  <Users className="w-3.5 h-3.5" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-baseline gap-2">
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tabular-nums font-mono">
+                {displayWargaCount}
+              </div>
+              <span className="text-xs text-slate-400 font-medium">jiwa aktif</span>
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 tabular-nums">
-            {totalWarga}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center flex-wrap gap-1">
-            <span className="text-emerald-700 font-semibold">{totalLaki} L</span>
+
+          <div className="text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-100 flex items-center flex-wrap gap-1">
+            <span className="text-emerald-700 font-semibold">{displayLakiCount} L</span>
             <span>·</span>
-            <span className="text-emerald-700 font-semibold">{totalPerempuan} P</span>
+            <span className="text-emerald-700 font-semibold">{displayPerempuanCount} P</span>
             <span>·</span>
-            <span>5 RT</span>
-            {(totalMeninggal > 0 || totalPindah > 0) && (
+            <span className="font-medium text-slate-600">{selectedWargaRt === 'all' ? '5 RT' : `RT ${selectedWargaRt}`}</span>
+            {(displayDeceasedCount > 0 || displayMovedCount > 0) && (
               <>
                 <span>·</span>
                 <span className="text-slate-400 font-medium">
                   {[
-                    totalPindah > 0 ? `${totalPindah} Pindah` : '',
-                    totalMeninggal > 0 ? `${totalMeninggal} Wafat` : ''
+                    displayMovedCount > 0 ? `${displayMovedCount} Pindah` : '',
+                    displayDeceasedCount > 0 ? `${displayDeceasedCount} Wafat` : ''
                   ].filter(Boolean).join(', ')}
                 </span>
               </>
@@ -184,31 +266,68 @@ export const RwDashboard: React.FC<RwDashboardProps> = ({ currentUser, onNavigat
           </div>
         </div>
 
-        {/* Total KK */}
+        {/* Total KK - Pilihan RT untuk Super Admin, RW & Bendahara RW */}
         <div 
           onClick={() => {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('rw03_filter_rt_kk', selectedKkRt);
+            }
             onNavigateTab('kk');
           }}
-          className="p-4 bg-white rounded-xl border border-slate-200 transition-all shadow-2xs hover:shadow-xs group hover:border-emerald-300 cursor-pointer"
+          className="p-4 bg-white rounded-2xl border border-slate-200 transition-all shadow-2xs hover:shadow-xs group hover:border-blue-300 cursor-pointer flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-medium">Total Kartu Keluarga</span>
+          <div>
+            <div className="flex items-center justify-between text-slate-500 mb-2 gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-xs font-semibold text-slate-700 truncate">Total Kartu Keluarga</span>
+                {selectedKkRt !== 'all' ? (
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 text-blue-800 shrink-0">
+                    RT {selectedKkRt}
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-600 shrink-0">
+                    Semua RT
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <select
+                  value={selectedKkRt}
+                  onChange={(e) => setSelectedKkRt(e.target.value)}
+                  className="text-[10px] sm:text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg px-2 py-0.5 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer transition-colors shadow-2xs"
+                  title="Pilih data KK RT yang ingin dilihat"
+                >
+                  <option value="all">Semua RT (RW 03)</option>
+                  <option value="01">RT 01</option>
+                  <option value="02">RT 02</option>
+                  <option value="03">RT 03</option>
+                  <option value="04">RT 04</option>
+                  <option value="05">RT 05</option>
+                </select>
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center group-hover:bg-blue-100 transition-colors shrink-0">
+                  <Home className="w-4 h-4" />
+                </div>
+              </div>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-              <Home className="w-4 h-4" />
+
+            <div className="flex items-baseline gap-2">
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tabular-nums font-mono">
+                {displayKkCount}
+              </div>
+              <span className="text-xs text-slate-400 font-medium">KK terdaftar</span>
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 tabular-nums">
-            {totalKk}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-            <span>Rata-rata 3-4 jiwa per keluarga</span>
-            {activeUser.role === 'super_admin' && (
-              <span className="text-[10px] text-emerald-700 font-semibold group-hover:underline">
-                Kelola KK →
-              </span>
-            )}
+
+          <div className="text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
+            <span>
+              {displayKkCount > 0 
+                ? `Rata-rata ${rataRataJiwaPerKk} jiwa/KK ${selectedKkRt === 'all' ? 'se-RW' : `RT ${selectedKkRt}`}`
+                : `Belum ada KK di RT ${selectedKkRt}`}
+            </span>
+            <span className="text-[10px] text-blue-700 font-semibold group-hover:underline flex items-center gap-0.5">
+              Lihat KK →
+            </span>
           </div>
         </div>
 

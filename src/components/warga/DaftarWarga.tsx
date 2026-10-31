@@ -69,7 +69,12 @@ export const DaftarWarga: React.FC<DaftarWargaProps> = ({ currentUser }) => {
       sessionStorage.removeItem('rw03_filter_age_group');
       setSelectedAgeGroup(filterAge);
     }
-  }, []);
+    const filterRt = sessionStorage.getItem('rw03_filter_rt_warga');
+    if (filterRt && currentUser.role !== 'pengurus_rt') {
+      sessionStorage.removeItem('rw03_filter_rt_warga');
+      setSelectedRt(filterRt);
+    }
+  }, [currentUser.role]);
 
   // Pastikan filter RT selalu sinkron dengan wilayah akun pengurus RT
   React.useEffect(() => {
