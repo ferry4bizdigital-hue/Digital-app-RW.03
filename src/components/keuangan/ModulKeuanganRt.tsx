@@ -47,10 +47,15 @@ const RT_CATEGORIES = [
 export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, onNavigateTab }) => {
   const isSuperAdmin = currentUser.role === 'super_admin';
   const isRtOfficer = currentUser.role === 'pengurus_rt';
+  const isBendahara = currentUser.role === 'bendahara';
   const isWarga = currentUser.role === 'warga';
   const userRt = StorageService.normalizeRt(currentUser.RT || '01');
 
-  // Selected RT for IT Admin / Super Admin (defaults to user's RT or '01')
+  // Hak akses mencatat / mengubah / menghapus pengeluaran RT HANYA diberikan kepada Pengurus RT (RT 01-05) dan Super Admin (IT Admin).
+  // Role Bendahara RW dan Warga TIDAK memiliki akses untuk mencatat baru / mengubah pengeluaran RT.
+  const canManageRtExpenses = isSuperAdmin || isRtOfficer;
+
+  // Selected RT for IT Admin / Super Admin & Bendahara RW (defaults to user's RT for RT officer & warga, or '01')
   const [selectedRt, setSelectedRt] = useState<string>((isRtOfficer || isWarga) ? userRt : '01');
   const [activeSubTab, setActiveSubTab] = useState<'pengeluaran' | 'penerimaan_iwd' | 'rekap_semua_rt'>('pengeluaran');
 
@@ -166,7 +171,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
   // Handlers for Add Expense
   const handleOpenAddModal = () => {
-    if (isWarga) return;
+    if (!canManageRtExpenses) return;
     setFormRt(selectedRt);
     setFormTanggal(new Date().toISOString().substring(0, 10));
     setFormKategori(RT_CATEGORIES[0]);
@@ -179,7 +184,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
   const handleSaveAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isWarga) return;
+    if (!canManageRtExpenses) return;
     const cleanNominal = parseInt(formNominal.replace(/\D/g, ''), 10);
     if (!cleanNominal || cleanNominal <= 0) {
       setFormError('Nominal pengeluaran harus berupa angka lebih besar dari Rp 0.');
@@ -205,7 +210,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
   // Handlers for Edit Expense
   const handleOpenEditModal = (item: RtExpenseItem) => {
-    if (isWarga) return;
+    if (!canManageRtExpenses) return;
     setItemToEdit(item);
     setFormRt(item.rt);
     setFormTanggal(item.tanggal);
@@ -219,7 +224,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
   const handleSaveEditExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isWarga || !itemToEdit) return;
+    if (!canManageRtExpenses || !itemToEdit) return;
 
     const cleanNominal = parseInt(formNominal.replace(/\D/g, ''), 10);
     if (!cleanNominal || cleanNominal <= 0) {
@@ -247,13 +252,13 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
   // Handlers for Delete Expense
   const handleOpenDeleteModal = (item: RtExpenseItem) => {
-    if (isWarga) return;
+    if (!canManageRtExpenses) return;
     setItemToDelete(item);
     setIsDeleteModalOpen(true);
   };
 
   const handleConfirmDelete = () => {
-    if (isWarga || !itemToDelete) return;
+    if (!canManageRtExpenses || !itemToDelete) return;
     StorageService.deleteRtExpense(itemToDelete.id);
     setIsDeleteModalOpen(false);
     setItemToDelete(null);
@@ -327,7 +332,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
           </div>
 
           <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
-            {!isWarga && (
+            {canManageRtExpenses && (
               <button
                 onClick={handleOpenAddModal}
                 className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
@@ -347,8 +352,8 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
           </div>
         </div>
 
-        {/* RT Selector Pill Tabs for Super Admin / IT Admin */}
-        {isSuperAdmin && (
+        {/* RT Selector Pill Tabs for Super Admin / IT Admin & Bendahara RW */}
+        {(isSuperAdmin || isBendahara) && (
           <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-600">Pilih Wilayah RT:</span>
@@ -377,7 +382,11 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
             <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Mode Role Play IT Admin: Memiliki akses penuh kelola RT 01 s/d RT 05</span>
+              <span>
+                {isSuperAdmin
+                  ? 'Mode Role Play IT Admin: Memiliki akses penuh kelola RT 01 s/d RT 05'
+                  : 'Mode Bendahara RW: Monitoring Kas & Keuangan RT 01 s/d RT 05 (Input dilakukan oleh Pengurus RT)'}
+              </span>
             </div>
           </div>
         )}
@@ -504,8 +513,14 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
-            <span>{isWarga ? 'Dikelola oleh Pengurus RT' : 'Dapat diinput & diedit pengurus'}</span>
-            {!isWarga ? (
+            <span>
+              {canManageRtExpenses
+                ? 'Dapat diinput & diedit pengurus'
+                : isBendahara
+                  ? 'Monitoring Kas RT (Diinput Pengurus RT)'
+                  : 'Dikelola oleh Pengurus RT'}
+            </span>
+            {canManageRtExpenses ? (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -517,7 +532,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
               </button>
             ) : (
               <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                Akses Transparansi Warga
+                {isBendahara ? 'Akses Monitoring Bendahara' : 'Akses Transparansi Warga'}
               </span>
             )}
           </div>
@@ -550,7 +565,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
           <span>Penerimaan IWD ({currentSummary.countIwdLunas} Lunas)</span>
         </button>
 
-        {isSuperAdmin && (
+        {(isSuperAdmin || isBendahara) && (
           <button
             onClick={() => setActiveSubTab('rekap_semua_rt')}
             className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer ${
@@ -612,11 +627,13 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
               </div>
               <h3 className="text-sm font-bold text-slate-800">Belum Ada Pengeluaran Dicatat</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                {isWarga
-                  ? `Belum ada pengeluaran yang dicatat oleh Pengurus RT ${selectedRt}. Data akan tampil otomatis saat diinput pengurus.`
-                  : `Catat pengeluaran untuk operasional, kebersihan, ronda, perbaikan lingkungan RT ${selectedRt}.`}
+                {canManageRtExpenses
+                  ? `Catat pengeluaran untuk operasional, kebersihan, ronda, perbaikan lingkungan RT ${selectedRt}.`
+                  : isBendahara
+                    ? `Belum ada pengeluaran yang dicatat oleh Pengurus RT ${selectedRt}. Data akan muncul otomatis setelah dicatat oleh Pengurus RT.`
+                    : `Belum ada pengeluaran yang dicatat oleh Pengurus RT ${selectedRt}. Data akan tampil otomatis saat diinput pengurus.`}
               </p>
-              {!isWarga ? (
+              {canManageRtExpenses ? (
                 <button
                   onClick={handleOpenAddModal}
                   className="mt-4 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow-xs"
@@ -626,7 +643,11 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
                 </button>
               ) : (
                 <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 text-xs font-medium">
-                  <span>Pencatatan pengeluaran dikelola oleh Pengurus RT {selectedRt}</span>
+                  <span>
+                    {isBendahara
+                      ? `Pencatatan pengeluaran dilakukan oleh Pengurus RT ${selectedRt} (Monitoring Bendahara RW)`
+                      : `Pencatatan pengeluaran dikelola oleh Pengurus RT ${selectedRt}`}
+                  </span>
                 </div>
               )}
             </div>
@@ -668,7 +689,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
                         - Rp {item.nominal.toLocaleString('id-ID')}
                       </td>
                       <td className="py-3 px-4 text-center whitespace-nowrap">
-                        {!isWarga ? (
+                        {canManageRtExpenses ? (
                           <div className="flex items-center justify-center gap-1.5">
                             <button
                               onClick={() => handleOpenEditModal(item)}
@@ -826,8 +847,8 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
         </div>
       )}
 
-      {/* SUBTAB 3: REKAPITULASI SEMUA RT (KHUSUS IT ADMIN / SUPER ADMIN) */}
-      {isSuperAdmin && activeSubTab === 'rekap_semua_rt' && (
+      {/* SUBTAB 3: REKAPITULASI SEMUA RT (KHUSUS IT ADMIN / SUPER ADMIN & BENDAHARA RW) */}
+      {(isSuperAdmin || isBendahara) && activeSubTab === 'rekap_semua_rt' && (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <div>
@@ -925,7 +946,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
       )}
 
       {/* MODAL 1: CATAT PENGELUARAN RT */}
-      {!isWarga && isAddModalOpen && (
+      {canManageRtExpenses && isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-emerald-50/40">
@@ -1082,7 +1103,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
       )}
 
       {/* MODAL 2: EDIT PENGELUARAN RT */}
-      {!isWarga && isEditModalOpen && itemToEdit && (
+      {canManageRtExpenses && isEditModalOpen && itemToEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-blue-50/40">
@@ -1222,7 +1243,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
       )}
 
       {/* MODAL 3: HAPUS PENGELUARAN RT */}
-      {!isWarga && isDeleteModalOpen && itemToDelete && (
+      {canManageRtExpenses && isDeleteModalOpen && itemToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 p-5">
             <div className="flex items-center gap-3 text-rose-700 mb-3">
