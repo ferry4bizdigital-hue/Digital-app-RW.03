@@ -166,6 +166,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
   // Handlers for Add Expense
   const handleOpenAddModal = () => {
+    if (isWarga) return;
     setFormRt(selectedRt);
     setFormTanggal(new Date().toISOString().substring(0, 10));
     setFormKategori(RT_CATEGORIES[0]);
@@ -178,6 +179,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
   const handleSaveAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isWarga) return;
     const cleanNominal = parseInt(formNominal.replace(/\D/g, ''), 10);
     if (!cleanNominal || cleanNominal <= 0) {
       setFormError('Nominal pengeluaran harus berupa angka lebih besar dari Rp 0.');
@@ -203,6 +205,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
   // Handlers for Edit Expense
   const handleOpenEditModal = (item: RtExpenseItem) => {
+    if (isWarga) return;
     setItemToEdit(item);
     setFormRt(item.rt);
     setFormTanggal(item.tanggal);
@@ -216,7 +219,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
   const handleSaveEditExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!itemToEdit) return;
+    if (isWarga || !itemToEdit) return;
 
     const cleanNominal = parseInt(formNominal.replace(/\D/g, ''), 10);
     if (!cleanNominal || cleanNominal <= 0) {
@@ -244,12 +247,13 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
 
   // Handlers for Delete Expense
   const handleOpenDeleteModal = (item: RtExpenseItem) => {
+    if (isWarga) return;
     setItemToDelete(item);
     setIsDeleteModalOpen(true);
   };
 
   const handleConfirmDelete = () => {
-    if (!itemToDelete) return;
+    if (isWarga || !itemToDelete) return;
     StorageService.deleteRtExpense(itemToDelete.id);
     setIsDeleteModalOpen(false);
     setItemToDelete(null);
@@ -500,16 +504,22 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
-            <span>Dapat diinput & diedit pengurus</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenAddModal();
-              }}
-              className="text-[11px] font-semibold text-emerald-800 hover:underline flex items-center gap-0.5"
-            >
-              + Catat Baru
-            </button>
+            <span>{isWarga ? 'Dikelola oleh Pengurus RT' : 'Dapat diinput & diedit pengurus'}</span>
+            {!isWarga ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenAddModal();
+                }}
+                className="text-[11px] font-semibold text-emerald-800 hover:underline flex items-center gap-0.5"
+              >
+                + Catat Baru
+              </button>
+            ) : (
+              <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                Akses Transparansi Warga
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -602,15 +612,23 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
               </div>
               <h3 className="text-sm font-bold text-slate-800">Belum Ada Pengeluaran Dicatat</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                Catat pengeluaran untuk operasional, kebersihan, ronda, perbaikan lingkungan RT {selectedRt}.
+                {isWarga
+                  ? `Belum ada pengeluaran yang dicatat oleh Pengurus RT ${selectedRt}. Data akan tampil otomatis saat diinput pengurus.`
+                  : `Catat pengeluaran untuk operasional, kebersihan, ronda, perbaikan lingkungan RT ${selectedRt}.`}
               </p>
-              <button
-                onClick={handleOpenAddModal}
-                className="mt-4 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow-xs"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ Catat Pengeluaran RT Sekarang</span>
-              </button>
+              {!isWarga ? (
+                <button
+                  onClick={handleOpenAddModal}
+                  className="mt-4 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Catat Pengeluaran RT Sekarang</span>
+                </button>
+              ) : (
+                <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 text-xs font-medium">
+                  <span>Pencatatan pengeluaran dikelola oleh Pengurus RT {selectedRt}</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -907,7 +925,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
       )}
 
       {/* MODAL 1: CATAT PENGELUARAN RT */}
-      {isAddModalOpen && (
+      {!isWarga && isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-emerald-50/40">
@@ -1064,7 +1082,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
       )}
 
       {/* MODAL 2: EDIT PENGELUARAN RT */}
-      {isEditModalOpen && itemToEdit && (
+      {!isWarga && isEditModalOpen && itemToEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-blue-50/40">
@@ -1204,7 +1222,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
       )}
 
       {/* MODAL 3: HAPUS PENGELUARAN RT */}
-      {isDeleteModalOpen && itemToDelete && (
+      {!isWarga && isDeleteModalOpen && itemToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 p-5">
             <div className="flex items-center gap-3 text-rose-700 mb-3">

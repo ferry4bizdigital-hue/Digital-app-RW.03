@@ -2377,6 +2377,12 @@ export class StorageService {
   }
 
   public static addRtExpense(data: Omit<RtExpenseItem, 'id' | 'createdAt'>): RtExpenseItem {
+    const cur = this.getCurrentUser();
+    if (cur.role === 'warga') {
+      console.warn('[StorageService] Akses ditolak: Role warga tidak memiliki izin mencatat pengeluaran RT.');
+      return null as any;
+    }
+
     const list = getStorage<RtExpenseItem[]>(STORAGE_KEYS.RT_EXPENSES, INITIAL_RT_EXPENSES);
     const effectiveRt = this.normalizeRt(data.rt);
     const newRecord: RtExpenseItem = {
@@ -2389,7 +2395,6 @@ export class StorageService {
     list.unshift(newRecord);
     setStorage(STORAGE_KEYS.RT_EXPENSES, list);
 
-    const cur = this.getCurrentUser();
     this.logAction(
       cur.userId,
       cur.nama,
@@ -2406,6 +2411,12 @@ export class StorageService {
   }
 
   public static updateRtExpense(id: string, updates: Partial<RtExpenseItem>): boolean {
+    const cur = this.getCurrentUser();
+    if (cur.role === 'warga') {
+      console.warn('[StorageService] Akses ditolak: Role warga tidak memiliki izin mengubah pengeluaran RT.');
+      return false;
+    }
+
     const list = getStorage<RtExpenseItem[]>(STORAGE_KEYS.RT_EXPENSES, INITIAL_RT_EXPENSES);
     const index = list.findIndex(e => e.id === id);
     if (index === -1) return false;
@@ -2419,7 +2430,6 @@ export class StorageService {
 
     setStorage(STORAGE_KEYS.RT_EXPENSES, list);
 
-    const cur = this.getCurrentUser();
     this.logAction(
       cur.userId,
       cur.nama,
@@ -2436,6 +2446,12 @@ export class StorageService {
   }
 
   public static deleteRtExpense(id: string): boolean {
+    const cur = this.getCurrentUser();
+    if (cur.role === 'warga') {
+      console.warn('[StorageService] Akses ditolak: Role warga tidak memiliki izin menghapus pengeluaran RT.');
+      return false;
+    }
+
     const list = getStorage<RtExpenseItem[]>(STORAGE_KEYS.RT_EXPENSES, INITIAL_RT_EXPENSES);
     const target = list.find(e => e.id === id);
     if (!target) return false;
@@ -2443,7 +2459,6 @@ export class StorageService {
     const remaining = list.filter(e => e.id !== id);
     setStorage(STORAGE_KEYS.RT_EXPENSES, remaining);
 
-    const cur = this.getCurrentUser();
     this.logAction(
       cur.userId,
       cur.nama,
