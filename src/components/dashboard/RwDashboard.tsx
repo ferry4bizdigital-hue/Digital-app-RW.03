@@ -56,6 +56,7 @@ export const RwDashboard: React.FC<RwDashboardProps> = ({ currentUser, onNavigat
   // Pilihan data RT yang ingin dilihat (untuk role Super Admin, RW, dan Bendahara RW)
   const [selectedWargaRt, setSelectedWargaRt] = useState<string>('all');
   const [selectedKkRt, setSelectedKkRt] = useState<string>('all');
+  const [selectedPyramidRt, setSelectedPyramidRt] = useState<string>('all');
 
   // Filter Warga berdasarkan pilihan RT (Semua RT atau spesifik RT 01 s/d RT 05)
   const displayActiveResidents = useMemo(() => {
@@ -104,17 +105,25 @@ export const RwDashboard: React.FC<RwDashboardProps> = ({ currentUser, onNavigat
   }));
   const maxWargaInRt = Math.max(...wargaPerRt.map(w => w.count), 1);
 
-  // Gender breakdown (hanya warga aktif)
-  const totalLaki = activeResidents.filter(r => r.jenisKelamin === 'L').length;
-  const totalPerempuan = activeResidents.filter(r => r.jenisKelamin === 'P').length;
-  const persenLaki = totalWarga > 0 ? Math.round((totalLaki / totalWarga) * 100) : 50;
-  const persenPerempuan = 100 - persenLaki;
+  // Data Warga untuk Piramida Usia Penduduk berdasarkan pilihan RT (Semua RT atau spesifik RT 01 s/d RT 05)
+  const pyramidResidents = useMemo(() => {
+    if (selectedPyramidRt === 'all') return activeResidents;
+    return activeResidents.filter(r => StorageService.normalizeRt(r.rt) === selectedPyramidRt);
+  }, [activeResidents, selectedPyramidRt]);
 
-  // Age groups: Balita (0-5), Anak/Remaja (6-17), Dewasa (18-59), Lansia (60+) (hanya warga aktif)
-  const ageBalita = activeResidents.filter(r => r.usia <= 5).length;
-  const ageAnak = activeResidents.filter(r => r.usia >= 6 && r.usia <= 17).length;
-  const ageDewasa = activeResidents.filter(r => r.usia >= 18 && r.usia <= 59).length;
-  const ageLansia = activeResidents.filter(r => r.usia >= 60).length;
+  const pyramidTotalWarga = pyramidResidents.length;
+
+  // Breakdown kelompok usia untuk Piramida Usia
+  const pyramidAgeBalita = useMemo(() => pyramidResidents.filter(r => r.usia <= 5), [pyramidResidents]);
+  const pyramidAgeAnak = useMemo(() => pyramidResidents.filter(r => r.usia >= 6 && r.usia <= 17), [pyramidResidents]);
+  const pyramidAgeDewasa = useMemo(() => pyramidResidents.filter(r => r.usia >= 18 && r.usia <= 59), [pyramidResidents]);
+  const pyramidAgeLansia = useMemo(() => pyramidResidents.filter(r => r.usia >= 60), [pyramidResidents]);
+
+  // Gender breakdown untuk Piramida Usia
+  const pyramidTotalLaki = useMemo(() => pyramidResidents.filter(r => r.jenisKelamin === 'L').length, [pyramidResidents]);
+  const pyramidTotalPerempuan = useMemo(() => pyramidResidents.filter(r => r.jenisKelamin === 'P').length, [pyramidResidents]);
+  const pyramidPersenLaki = pyramidTotalWarga > 0 ? Math.round((pyramidTotalLaki / pyramidTotalWarga) * 100) : 50;
+  const pyramidPersenPerempuan = pyramidTotalWarga > 0 ? 100 - pyramidPersenLaki : 50;
 
   // Finance calculation (sinkron dengan Buku Kas dan Transparansi RW 03)
   const { totalMasuk: totalPemasukan, totalKeluar: totalPengeluaran, saldo: saldoKasRw } = StorageService.getKasRwSummary();
@@ -408,32 +417,154 @@ export const RwDashboard: React.FC<RwDashboardProps> = ({ currentUser, onNavigat
           </div>
         </div>
 
-        {/* Age Groups & Gender */}
+        {/* Age Groups & Gender - Piramida Kelompok Usia Penduduk dengan Pilihan RT */}
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs flex flex-col justify-between">
           <div>
-            <h3 className="font-bold text-slate-900 text-sm mb-1">Piramida Kelompok Usia Penduduk</h3>
-            <p className="text-xs text-slate-500 mb-4">Basis data perencanaan program Posyandu, Lansia & Karang Taruna</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-slate-900 text-sm">Piramida Kelompok Usia Penduduk</h3>
+                  {selectedPyramidRt !== 'all' ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                      RT {selectedPyramidRt}
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
+                      Semua RT (RW 03)
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Basis data perencanaan program Posyandu, Lansia & Karang Taruna {selectedPyramidRt === 'all' ? 'se-RW 03' : `wilayah RT ${selectedPyramidRt}`}
+                </p>
+              </div>
+
+              {/* Selector RT untuk Piramida Usia */}
+              <div className="shrink-0 flex items-center gap-1.5 self-start sm:self-center">
+                <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">Pilih RT:</span>
+                <select
+                  value={selectedPyramidRt}
+                  onChange={(e) => setSelectedPyramidRt(e.target.value)}
+                  className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer transition-colors shadow-2xs"
+                  title="Pilih data RT untuk Piramida Kelompok Usia Penduduk"
+                >
+                  <option value="all">Semua RT (RW 03)</option>
+                  <option value="01">RT 01</option>
+                  <option value="02">RT 02</option>
+                  <option value="03">RT 03</option>
+                  <option value="04">RT 04</option>
+                  <option value="05">RT 05</option>
+                </select>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[11px] text-slate-500 block">Balita (0 - 5 Th)</span>
-                <span className="text-lg font-bold text-slate-900 tabular-nums">{ageBalita} Jiwa</span>
-                <span className="text-[10px] text-emerald-700 block mt-0.5">Target Posyandu Melati</span>
+              {/* Balita */}
+              <div 
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('rw03_filter_age_group', 'balita');
+                    sessionStorage.setItem('rw03_filter_rt_warga', selectedPyramidRt);
+                  }
+                  onNavigateTab('warga');
+                }}
+                className="p-3 rounded-lg bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 transition-all cursor-pointer group"
+                title="Klik untuk melihat daftar warga Balita"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500 block">Balita (0 - 5 Th)</span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {pyramidAgeBalita.filter(r => r.jenisKelamin === 'L').length}L · {pyramidAgeBalita.filter(r => r.jenisKelamin === 'P').length}P
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-lg font-bold text-slate-900 tabular-nums group-hover:text-emerald-700 transition-colors">
+                    {pyramidAgeBalita.length}
+                  </span>
+                  <span className="text-xs text-slate-400">Jiwa</span>
+                </div>
+                <span className="text-[10px] text-emerald-700 block mt-1 font-medium">Target Posyandu Melati</span>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[11px] text-slate-500 block">Anak & Remaja (6 - 17 Th)</span>
-                <span className="text-lg font-bold text-slate-900 tabular-nums">{ageAnak} Jiwa</span>
-                <span className="text-[10px] text-indigo-700 block mt-0.5">Usia Pendidikan</span>
+
+              {/* Anak & Remaja */}
+              <div 
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('rw03_filter_age_group', 'anak');
+                    sessionStorage.setItem('rw03_filter_rt_warga', selectedPyramidRt);
+                  }
+                  onNavigateTab('warga');
+                }}
+                className="p-3 rounded-lg bg-slate-50 hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-300 transition-all cursor-pointer group"
+                title="Klik untuk melihat daftar warga Anak & Remaja"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500 block">Anak & Remaja (6 - 17 Th)</span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {pyramidAgeAnak.filter(r => r.jenisKelamin === 'L').length}L · {pyramidAgeAnak.filter(r => r.jenisKelamin === 'P').length}P
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-lg font-bold text-slate-900 tabular-nums group-hover:text-indigo-700 transition-colors">
+                    {pyramidAgeAnak.length}
+                  </span>
+                  <span className="text-xs text-slate-400">Jiwa</span>
+                </div>
+                <span className="text-[10px] text-indigo-700 block mt-1 font-medium">Usia Pendidikan</span>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[11px] text-slate-500 block">Dewasa Produktif (18 - 59 Th)</span>
-                <span className="text-lg font-bold text-slate-900 tabular-nums">{ageDewasa} Jiwa</span>
-                <span className="text-[10px] text-blue-700 block mt-0.5">Tenaga Kerja & Usaha</span>
+
+              {/* Dewasa Produktif */}
+              <div 
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('rw03_filter_age_group', 'dewasa');
+                    sessionStorage.setItem('rw03_filter_rt_warga', selectedPyramidRt);
+                  }
+                  onNavigateTab('warga');
+                }}
+                className="p-3 rounded-lg bg-slate-50 hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300 transition-all cursor-pointer group"
+                title="Klik untuk melihat daftar warga Dewasa"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500 block">Dewasa Produktif (18 - 59 Th)</span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {pyramidAgeDewasa.filter(r => r.jenisKelamin === 'L').length}L · {pyramidAgeDewasa.filter(r => r.jenisKelamin === 'P').length}P
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-lg font-bold text-slate-900 tabular-nums group-hover:text-blue-700 transition-colors">
+                    {pyramidAgeDewasa.length}
+                  </span>
+                  <span className="text-xs text-slate-400">Jiwa</span>
+                </div>
+                <span className="text-[10px] text-blue-700 block mt-1 font-medium">Tenaga Kerja & Usaha</span>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[11px] text-slate-500 block">Lanjut Usia (60+ Th)</span>
-                <span className="text-lg font-bold text-slate-900 tabular-nums">{ageLansia} Jiwa</span>
-                <span className="text-[10px] text-amber-700 block mt-0.5">Program Posbindu Lansia</span>
+
+              {/* Lansia */}
+              <div 
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('rw03_filter_age_group', 'lansia');
+                    sessionStorage.setItem('rw03_filter_rt_warga', selectedPyramidRt);
+                  }
+                  onNavigateTab('warga');
+                }}
+                className="p-3 rounded-lg bg-slate-50 hover:bg-amber-50/60 border border-slate-200 hover:border-amber-300 transition-all cursor-pointer group"
+                title="Klik untuk melihat daftar warga Lansia"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500 block">Lanjut Usia (60+ Th)</span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {pyramidAgeLansia.filter(r => r.jenisKelamin === 'L').length}L · {pyramidAgeLansia.filter(r => r.jenisKelamin === 'P').length}P
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-lg font-bold text-slate-900 tabular-nums group-hover:text-amber-700 transition-colors">
+                    {pyramidAgeLansia.length}
+                  </span>
+                  <span className="text-xs text-slate-400">Jiwa</span>
+                </div>
+                <span className="text-[10px] text-amber-700 block mt-1 font-medium">Program Posbindu Lansia</span>
               </div>
             </div>
           </div>
@@ -441,14 +572,16 @@ export const RwDashboard: React.FC<RwDashboardProps> = ({ currentUser, onNavigat
           {/* Gender Ratio Bar */}
           <div className="pt-3 border-t border-slate-100">
             <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className="text-slate-600">Rasio Jenis Kelamin:</span>
+              <span className="text-slate-600">
+                Rasio Gender {selectedPyramidRt === 'all' ? '(RW 03)' : `(RT ${selectedPyramidRt})`}:
+              </span>
               <span className="font-semibold text-slate-800">
-                Laki-laki {persenLaki}% · Perempuan {persenPerempuan}%
+                Laki-laki {pyramidPersenLaki}% ({pyramidTotalLaki}) · Perempuan {pyramidPersenPerempuan}% ({pyramidTotalPerempuan})
               </span>
             </div>
             <div className="w-full h-2.5 bg-slate-100 rounded-full flex overflow-hidden">
-              <div className="bg-emerald-600 h-full" style={{ width: `${persenLaki}%` }} />
-              <div className="bg-pink-500 h-full" style={{ width: `${persenPerempuan}%` }} />
+              <div className="bg-emerald-600 h-full transition-all duration-300" style={{ width: `${pyramidPersenLaki}%` }} />
+              <div className="bg-pink-500 h-full transition-all duration-300" style={{ width: `${pyramidPersenPerempuan}%` }} />
             </div>
           </div>
         </div>
