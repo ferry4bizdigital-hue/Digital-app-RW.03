@@ -45,6 +45,7 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
   const [expenseSearch, setExpenseSearch] = useState('');
   const [selectedExpenseCategory, setSelectedExpenseCategory] = useState<string>('all');
   const [selectedExpenseDetail, setSelectedExpenseDetail] = useState<RtExpenseItem | null>(null);
+  const [isExpenseListModalOpen, setIsExpenseListModalOpen] = useState(false);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -430,7 +431,11 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
           {/* 3 Metrics: Penerimaan IWD, Total Pengeluaran RT, Sisa Saldo RT */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
             {/* 1. Penerimaan IWD */}
-            <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200">
+            <div 
+              onClick={() => setTransparansiTab('iwd')}
+              className="p-3 bg-emerald-50/70 hover:bg-emerald-50/90 rounded-xl border border-emerald-200 hover:border-emerald-300 transition-all cursor-pointer group shadow-2xs"
+              title="Klik untuk melihat daftar status IWD warga"
+            >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -448,31 +453,46 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
               </div>
             </div>
 
-            {/* 2. Total Pengeluaran RT */}
-            <div className="p-3 bg-rose-50/70 rounded-xl border border-rose-200">
+            {/* 2. Total Pengeluaran RT (Dapat diklik untuk melihat rincian transaksi) */}
+            <div 
+              onClick={() => {
+                setIsExpenseListModalOpen(true);
+                setTransparansiTab('pengeluaran');
+              }}
+              className="p-3 bg-rose-50/70 hover:bg-rose-100/60 rounded-xl border border-rose-200 hover:border-rose-400 transition-all cursor-pointer group shadow-2xs hover:shadow-xs active:scale-[0.99] relative overflow-hidden"
+              title="Klik untuk melihat rincian seluruh transaksi pengeluaran RT"
+            >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1">
                   <TrendingDown className="w-3.5 h-3.5 text-rose-600" />
                   Total Pengeluaran RT
                 </span>
-                <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded-full">
+                <span className="text-[10px] font-bold text-rose-700 bg-rose-100 group-hover:bg-rose-200 px-1.5 py-0.2 rounded-full transition-colors">
                   {rtKasSummary.countPengeluaran} Transaksi
                 </span>
               </div>
-              <div className="text-base sm:text-lg font-bold font-mono text-rose-800">
+              <div className="text-base sm:text-lg font-bold font-mono text-rose-800 group-hover:text-rose-900 transition-colors">
                 Rp {totalPengeluaranRt.toLocaleString('id-ID')}
               </div>
               <div className="text-[10px] text-rose-600 mt-0.5">
                 Realisasi belanja / kegiatan lingkungan
               </div>
+              <div className="mt-2 pt-1.5 border-t border-rose-200/60 flex items-center justify-between text-[10px] font-semibold text-rose-700 group-hover:text-rose-900 group-hover:underline">
+                <span>Klik untuk lihat rincian transaksi</span>
+                <span>→</span>
+              </div>
             </div>
 
             {/* 3. Sisa Saldo RT */}
-            <div className={`p-3 rounded-xl border ${
-              sisaSaldoRt >= 0 
-                ? 'bg-gradient-to-br from-emerald-100/70 to-teal-50 border-emerald-300' 
-                : 'bg-rose-100/70 border-rose-300'
-            }`}>
+            <div 
+              onClick={() => onNavigateTab('keuangan_rt')}
+              className={`p-3 rounded-xl border cursor-pointer group hover:shadow-xs transition-all ${
+                sisaSaldoRt >= 0 
+                  ? 'bg-gradient-to-br from-emerald-100/70 to-teal-50 border-emerald-300 hover:border-emerald-400' 
+                  : 'bg-rose-100/70 border-rose-300 hover:border-rose-400'
+              }`}
+              title="Klik untuk membuka buku kas RT lengkap"
+            >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1">
                   <Wallet className="w-3.5 h-3.5 text-emerald-700" />
@@ -489,8 +509,9 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
               }`}>
                 Rp {sisaSaldoRt.toLocaleString('id-ID')}
               </div>
-              <div className="text-[10px] text-slate-600 mt-0.5">
-                Penerimaan IWD - Pengeluaran RT
+              <div className="text-[10px] text-slate-600 mt-0.5 flex items-center justify-between">
+                <span>Penerimaan IWD - Pengeluaran</span>
+                <span className="font-semibold text-emerald-800 group-hover:underline">Buku Kas →</span>
               </div>
             </div>
           </div>
@@ -1123,6 +1144,157 @@ export const WargaDashboard: React.FC<WargaDashboardProps> = ({ currentUser, onN
                 className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-colors cursor-pointer"
               >
                 Tutup Detail
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Daftar Seluruh Rincian Transaksi Pengeluaran RT untuk Warga */}
+      {isExpenseListModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+            {/* Header Modal */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-rose-50/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold shrink-0">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full border border-rose-200">
+                      RT {currentRt} Kebon Kangkung
+                    </span>
+                    <span className="text-xs text-slate-400">· Transparansi Pengeluaran</span>
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base mt-0.5">
+                    Rincian Transaksi Pengeluaran Kas RT {currentRt}
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsExpenseListModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Summary Highlight Box */}
+            <div className="p-4 bg-slate-50 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-2.5 shrink-0 text-xs">
+              <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                <span className="text-[10px] text-slate-500 block uppercase font-medium">Total Pengeluaran</span>
+                <span className="text-base font-bold font-mono text-rose-700 block mt-0.5">
+                  Rp {totalPengeluaranRt.toLocaleString('id-ID')}
+                </span>
+                <span className="text-[10px] text-slate-400">{rtExpensesList.length} transaksi tercatat</span>
+              </div>
+              <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                <span className="text-[10px] text-slate-500 block uppercase font-medium">Penerimaan IWD (Lunas)</span>
+                <span className="text-base font-bold font-mono text-emerald-800 block mt-0.5">
+                  Rp {rtKasSummary.totalPenerimaanIwd.toLocaleString('id-ID')}
+                </span>
+                <span className="text-[10px] text-slate-400">{lunasRtCount} KK telah melunasi</span>
+              </div>
+              <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                <span className="text-[10px] text-slate-500 block uppercase font-medium">Sisa Saldo Kas RT</span>
+                <span className={`text-base font-bold font-mono block mt-0.5 ${sisaSaldoRt >= 0 ? 'text-emerald-900' : 'text-rose-900'}`}>
+                  Rp {sisaSaldoRt.toLocaleString('id-ID')}
+                </span>
+                <span className="text-[10px] text-emerald-700 font-medium">
+                  {sisaSaldoRt >= 0 ? 'Surplus Tersedia' : 'Defisit'}
+                </span>
+              </div>
+            </div>
+
+            {/* Search Input */}
+            <div className="p-3 border-b border-slate-100 bg-white shrink-0">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari transaksi berdasarkan keperluan, kategori, atau pencatat..."
+                  value={expenseSearch}
+                  onChange={e => setExpenseSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                />
+              </div>
+            </div>
+
+            {/* Transaction List / Table (Scrollable) */}
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4 divide-y divide-slate-100">
+              {filteredRtExpenses.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  <span>Tidak ada data transaksi pengeluaran yang sesuai.</span>
+                </div>
+              ) : (
+                filteredRtExpenses.map((exp, idx) => (
+                  <div
+                    key={exp.id}
+                    onClick={() => {
+                      setSelectedExpenseDetail(exp);
+                    }}
+                    className="p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer group flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-700 font-mono text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                        {idx + 1}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-slate-900 group-hover:text-rose-900 transition-colors text-xs sm:text-sm">
+                            {exp.keterangan}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700">
+                            {exp.kategori}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+                          <span>📅 {exp.tanggal}</span>
+                          <span>·</span>
+                          <span>Dicatat: <span className="font-medium text-slate-700">{exp.pencatat}</span></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 self-end sm:self-center">
+                      <div className="text-right">
+                        <div className="text-sm font-bold font-mono text-rose-700">
+                          - Rp {exp.nominal.toLocaleString('id-ID')}
+                        </div>
+                        <span className="text-[10px] text-emerald-700 group-hover:underline flex items-center justify-end gap-0.5">
+                          <Eye className="w-3 h-3" />
+                          <span>Lihat Bukti</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsExpenseListModalOpen(false);
+                  onNavigateTab('keuangan_rt');
+                }}
+                className="px-3.5 py-2 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Landmark className="w-3.5 h-3.5 text-emerald-800" />
+                <span>Buka Buku Kas RT Lengkap</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsExpenseListModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs transition-colors cursor-pointer"
+              >
+                Tutup
               </button>
             </div>
           </div>
