@@ -2378,8 +2378,9 @@ export class StorageService {
 
   public static addRtExpense(data: Omit<RtExpenseItem, 'id' | 'createdAt'>): RtExpenseItem {
     const cur = this.getCurrentUser();
-    if (cur.role !== 'super_admin' && cur.role !== 'pengurus_rt') {
-      console.warn(`[StorageService] Akses ditolak: Role ${cur.role} tidak memiliki izin mencatat pengeluaran RT.`);
+    const isBendahara = cur.role === 'bendahara' || cur.jabatan?.toLowerCase().includes('bendahara');
+    if ((cur.role !== 'super_admin' && cur.role !== 'pengurus_rt') || isBendahara) {
+      console.warn(`[StorageService] Akses ditolak: Role ${cur.role} / Bendahara RW tidak memiliki izin mencatat pengeluaran RT.`);
       return null as any;
     }
 
@@ -2412,8 +2413,9 @@ export class StorageService {
 
   public static updateRtExpense(id: string, updates: Partial<RtExpenseItem>): boolean {
     const cur = this.getCurrentUser();
-    if (cur.role !== 'super_admin' && cur.role !== 'pengurus_rt') {
-      console.warn(`[StorageService] Akses ditolak: Role ${cur.role} tidak memiliki izin mengubah pengeluaran RT.`);
+    const isBendahara = cur.role === 'bendahara' || cur.jabatan?.toLowerCase().includes('bendahara');
+    if ((cur.role !== 'super_admin' && cur.role !== 'pengurus_rt') || isBendahara) {
+      console.warn(`[StorageService] Akses ditolak: Role ${cur.role} / Bendahara RW tidak memiliki izin mengubah pengeluaran RT.`);
       return false;
     }
 
@@ -2447,8 +2449,9 @@ export class StorageService {
 
   public static deleteRtExpense(id: string): boolean {
     const cur = this.getCurrentUser();
-    if (cur.role !== 'super_admin' && cur.role !== 'pengurus_rt') {
-      console.warn(`[StorageService] Akses ditolak: Role ${cur.role} tidak memiliki izin menghapus pengeluaran RT.`);
+    const isBendahara = cur.role === 'bendahara' || cur.jabatan?.toLowerCase().includes('bendahara');
+    if ((cur.role !== 'super_admin' && cur.role !== 'pengurus_rt') || isBendahara) {
+      console.warn(`[StorageService] Akses ditolak: Role ${cur.role} / Bendahara RW tidak memiliki izin menghapus pengeluaran RT.`);
       return false;
     }
 

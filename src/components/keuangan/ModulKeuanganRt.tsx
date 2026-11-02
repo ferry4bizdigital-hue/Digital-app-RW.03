@@ -47,13 +47,13 @@ const RT_CATEGORIES = [
 export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, onNavigateTab }) => {
   const isSuperAdmin = currentUser.role === 'super_admin';
   const isRtOfficer = currentUser.role === 'pengurus_rt';
-  const isBendahara = currentUser.role === 'bendahara';
+  const isBendahara = currentUser.role === 'bendahara' || currentUser.jabatan?.toLowerCase().includes('bendahara');
   const isWarga = currentUser.role === 'warga';
   const userRt = StorageService.normalizeRt(currentUser.RT || '01');
 
-  // Hak akses mencatat / mengubah / menghapus pengeluaran RT HANYA diberikan kepada Pengurus RT (RT 01-05) dan Super Admin (IT Admin).
-  // Role Bendahara RW dan Warga TIDAK memiliki akses untuk mencatat baru / mengubah pengeluaran RT.
-  const canManageRtExpenses = isSuperAdmin || isRtOfficer;
+  // Hak akses mencatat / menginput / mengubah / menghapus pengeluaran RT HANYA diberikan kepada Pengurus RT (RT 01-05) dan Super Admin (IT Admin).
+  // Role Bendahara RW dan Warga TIDAK memiliki akses untuk menginput atau mencatat baru pengeluaran RT (Bendahara RW hanya monitoring & transparansi).
+  const canManageRtExpenses = (isSuperAdmin || isRtOfficer) && !isBendahara && !isWarga;
 
   // Selected RT for IT Admin / Super Admin & Bendahara RW (defaults to user's RT for RT officer & warga, or '01')
   const [selectedRt, setSelectedRt] = useState<string>((isRtOfficer || isWarga) ? userRt : '01');
@@ -318,7 +318,13 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  {isSuperAdmin ? 'IT Admin Super RW 03' : isWarga ? `Transparansi Warga RT ${userRt}` : `Pengurus RT ${userRt}`}
+                  {isSuperAdmin 
+                    ? 'IT Admin Super RW 03' 
+                    : isBendahara 
+                      ? 'Bendahara RW 03 (Monitoring)' 
+                      : isWarga 
+                        ? `Transparansi Warga RT ${userRt}` 
+                        : `Pengurus RT ${userRt}`}
                 </span>
                 <span className="text-xs text-slate-400">· Buku Kas Lingkungan</span>
               </div>
@@ -332,7 +338,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
           </div>
 
           <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
-            {canManageRtExpenses && (
+            {canManageRtExpenses ? (
               <button
                 onClick={handleOpenAddModal}
                 className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
@@ -340,7 +346,12 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
                 <Plus className="w-4 h-4 stroke-[2.4px]" />
                 <span>Catat Pengeluaran RT</span>
               </button>
-            )}
+            ) : isBendahara ? (
+              <div className="px-3.5 py-2 bg-slate-50 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
+                <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span>Monitoring Kas RT (Input Khusus Pengurus RT)</span>
+              </div>
+            ) : null}
             <button
               onClick={handleExportCsv}
               className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -385,7 +396,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
               <span>
                 {isSuperAdmin
                   ? 'Mode Role Play IT Admin: Memiliki akses penuh kelola RT 01 s/d RT 05'
-                  : 'Mode Bendahara RW: Monitoring Kas & Keuangan RT 01 s/d RT 05 (Input dilakukan oleh Pengurus RT)'}
+                  : 'Mode Bendahara RW: Monitoring Kas & Keuangan RT 01 s/d RT 05 (Akses input pengeluaran hanya untuk Pengurus RT)'}
               </span>
             </div>
           </div>
@@ -661,7 +672,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
                     <th className="py-3 px-4">Keterangan Pengeluaran</th>
                     <th className="py-3 px-4">Dicatat Oleh</th>
                     <th className="py-3 px-4 text-right">Nominal</th>
-                    <th className="py-3 px-4 text-center">Aksi</th>
+                    <th className="py-3 px-4 text-center">{canManageRtExpenses ? 'Aksi' : 'Status'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -708,7 +719,7 @@ export const ModulKeuanganRt: React.FC<ModulKeuanganRtProps> = ({ currentUser, o
                           </div>
                         ) : (
                           <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-semibold border border-emerald-200">
-                            Terverifikasi RT
+                            {isBendahara ? 'Monitoring Bendahara' : 'Terverifikasi RT'}
                           </span>
                         )}
                       </td>
